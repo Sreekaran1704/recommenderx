@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "movies",
 ]
 
 MIDDLEWARE = [
@@ -75,8 +76,12 @@ WSGI_APPLICATION = "recommenderx.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'movie-recommendation',  # Database name
+        'USER': 'django_user',  # Your PostgreSQL user
+        'PASSWORD': 'recommendx12345',  # Your PostgreSQL password
+        'HOST': '34.122.215.180',  # Find this in Cloud SQL Instance details
+        'PORT': '5432',
     }
 }
 
