@@ -1,2 +1,15 @@
 django
 psycopg2-binary
+clerk-sdk-python  # Updated from clerk-backend-api to the official SDK
+python-dotenv
+djangorestframework
+PyJWT
+requests
+django-cors-headers  # Added for handling CORS when working with Clerk
+numpy
+pandas
+scikit-learn
+matplotlib
+drf-yasg
+coreapi
+pyyaml
