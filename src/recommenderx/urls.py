@@ -16,12 +16,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include,path
-from .views import home_page_view, movie_list_view
+from .views import home_page_view, movie_list_view, movie_detail_view, recommendations_view, watchlist_view, add_to_watchlist_view
 from rest_framework.documentation import include_docs_urls
 
 urlpatterns = [
     path("", home_page_view),
     path("movies/", movie_list_view),
+    path("movies/<int:movie_id>/", movie_detail_view),
+    path("recommendations/", recommendations_view),
+    path("watchlist/", watchlist_view),
+    path("watchlist/add/", add_to_watchlist_view),
     path("api/", include("movies.urls")),
     path("api/users/", include("users.urls")),
     path("admin/", admin.site.urls),

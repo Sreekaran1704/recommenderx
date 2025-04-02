@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ movie.title }} | RecommenderX{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <img src="{{ movie.poster_url }}" class="img-fluid rounded" alt="{{ movie.title }}">
+    </div>
+    <div class="col-md-8">
+        <h1>{{ movie.title }}</h1>
+        <p class="lead">{{ movie.release_year }} | {{ movie.genre }}</p>
+        
+        <div class="mb-3">
+            <span class="badge bg-warning text-dark">★ {{ average_rating|floatformat:1 }}</span>
+            <small class="text-muted">{{ ratings_count }} ratings</small>
+        </div>
+        
+        <h5>Overview</h5>
+        <p>{{ movie.description }}</p>
+        
+        <div class="d-flex gap-2 mb-4">
+            <form method="post" action="/watchlist/add/" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="movie_id" value="{{ movie.id }}">
+                <button type="submit" class="btn btn-outline-primary">Add to Watchlist</button>
+            </form>
+            
+            <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#rateModal">
+                Rate this Movie
+            </button>
+        </div>
+        
+        <h5>Ratings</h5>
+        {% if ratings %}
+            <div class="list-group">
+                {% for rating in ratings %}
+                <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">{{ rating.user }}</h6>
+                        <small>{{ rating.rating }} ★</small>
+                    </div>
+                    {% if rating.comment %}
+                        <p class="mb-1">{{ rating.comment }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No ratings yet. Be the first to rate this movie!</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Rating Modal -->
+<div class="modal fade" id="rateModal" tabindex="-1" aria-labelledby="rateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rateModalLabel">Rate {{ movie.title }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="/ratings/add/">
+                    {% csrf_token %}
+                    <input type="hidden" name="movie_id" value="{{ movie.id }}">
+                    
+                    <div class="mb-3">
+                        <label for="rating" class="form-label">Your Rating</label>
+                        <select class="form-select" id="rating" name="rating" required>
+                            <option value="">Select a rating</option>
+                            <option value="1">1 - Poor</option>
+                            <option value="2">2 - Fair</option>
+                            <option value="3">3 - Good</option>
+                            <option value="4">4 - Very Good</option>
+                            <option value="5">5 - Excellent</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="comment" class="form-label">Comment (optional)</label>
+                        <textarea class="form-control" id="comment" name="comment" rows="3"></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Submit Rating</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

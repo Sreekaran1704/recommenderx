@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}My Watchlist | RecommenderX{% endblock %}
+
+{% block content %}
+<h1>My Watchlist</h1>
+<p class="lead">Movies you want to watch</p>
+
+<div class="row">
+    {% for movie in movies %}
+    <div class="col-md-4 mb-4">
+        <div class="card movie-card">
+            <img src="{{ movie.poster_url }}" class="card-img-top movie-poster" alt="{{ movie.title }}">
+            <div class="card-body">
+                <h5 class="card-title">{{ movie.title }}</h5>
+                <p class="card-text"><strong>Genre:</strong> {{ movie.genre }}</p>
+                <p class="card-text">{{ movie.description|truncatechars:100 }}</p>
+                <a href="/movies/{{ movie.id }}/" class="btn btn-primary">View Details</a>
+                <form method="post" action="/watchlist/remove/" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="movie_id" value="{{ movie.id }}">
+                    <button type="submit" class="btn btn-outline-danger">Remove</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info">
+            <p>Your watchlist is empty. Add movies to your watchlist to keep track of what you want to watch!</p>
+            <a href="/movies/" class="btn btn-primary">Browse Movies</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
