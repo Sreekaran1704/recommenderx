@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include,path
-from .views import home_page_view, movie_list_view, movie_detail_view, recommendations_view, watchlist_view, add_to_watchlist_view
+from .views import home_page_view, movie_list_view, movie_detail_view, recommendations_view, watchlist_view, add_to_watchlist_view, login_view, signup_view, logout_view, profile_view
 from rest_framework.documentation import include_docs_urls
 
 urlpatterns = [
@@ -26,6 +26,10 @@ urlpatterns = [
     path("recommendations/", recommendations_view),
     path("watchlist/", watchlist_view),
     path("watchlist/add/", add_to_watchlist_view),
+    path("login/", login_view),
+    path("signup/", signup_view),
+    path("logout/", logout_view),
+    path("profile/", profile_view),
     path("api/", include("movies.urls")),
     path("api/users/", include("users.urls")),
     path("admin/", admin.site.urls),

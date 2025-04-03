@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}My Profile | RecommenderX{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Profile Information</h4>
+            </div>
+            <div class="card-body">
+                <p><strong>Username:</strong> {{ user.username }}</p>
+                <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}</p>
+                <a href="/profile/edit/" class="btn btn-primary">Edit Profile</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">My Ratings</h4>
+            </div>
+            <div class="card-body">
+                {% if user.ratings %}
+                <div class="list-group">
+                    {% for rating in user.ratings %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">{{ rating.movie.title }}</h5>
+                            <span class="badge bg-warning text-dark">{{ rating.rating }} ★</span>
+                        </div>
+                        {% if rating.comment %}
+                        <p class="mb-1">{{ rating.comment }}</p>
+                        {% endif %}
+                        <small class="text-muted">Rated on {{ rating.created_at }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p>You haven't rated any movies yet.</p>
+                <a href="/movies/" class="btn btn-primary">Browse Movies</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

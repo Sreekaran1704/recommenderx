@@ -1,10 +1,15 @@
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 import requests
+import json
+from django.contrib import messages
+from django.conf import settings
 
 def home_page_view(request, *args, **kwargs):
 
-    return render(request, 'home.html')
+    return render(request, 'home.html', {
+        'CLERK_PUBLISHABLE_KEY': settings.CLERK_PUBLISHABLE_KEY
+    })
 
 def movie_list_view(request):
 
@@ -84,3 +89,53 @@ def add_to_watchlist_view(request):
         # For now, we'll just redirect back
         return redirect(f'/movies/{movie_id}/')
     return redirect('/movies/')
+
+def login_view(request):
+    # Pass the Clerk publishable key to the template
+    return render(request, 'users/login.html', {
+        'CLERK_PUBLISHABLE_KEY': settings.CLERK_PUBLISHABLE_KEY
+    })
+
+def signup_view(request):
+    # Pass the Clerk publishable key to the template
+    return render(request, 'users/signup.html', {
+        'CLERK_PUBLISHABLE_KEY': settings.CLERK_PUBLISHABLE_KEY
+    })
+
+def logout_view(request):
+    return redirect('/')
+
+def profile_view(request):
+    # Get the Clerk token from the request headers or cookies
+    clerk_token = request.COOKIES.get('__clerk_session') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    
+    if not clerk_token:
+        return redirect('/login/')
+    
+    # Get user profile data using the Clerk token
+    try:
+        headers = {'Authorization': f'Bearer {clerk_token}'}
+        response = requests.get('http://localhost:8000/api/users/profile/', headers=headers)
+        
+        if response.status_code == 200:
+            user_data = response.json()
+            
+            # Get user's ratings
+            user_id = user_data.get('id')
+            ratings_response = requests.get(
+                f'http://localhost:8000/api/ratings/user/{user_id}/',
+                headers=headers
+            )
+            
+            if ratings_response.status_code == 200:
+                ratings_data = ratings_response.json()
+                user_data['ratings'] = ratings_data.get('ratings', [])
+            else:
+                user_data['ratings'] = []
+            
+            return render(request, 'users/profile.html', {'user': user_data})
+        else:
+            return redirect('/login/')
+            
+    except Exception as e:
+        return redirect('/login/')

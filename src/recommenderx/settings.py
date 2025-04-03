@@ -17,8 +17,11 @@ from pathlib import Path
 # Load environment variables from .env file
 load_dotenv()
 
-CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_FRONTEND_API")
-CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_API")
+CLERK_PUBLISHABLE_KEY = 'pk_test_cmVsYXhlZC1zdHVkLTY1LmNsZXJrLmFjY291bnRzLmRldiQ'
+CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
+
+
+print(f"Loaded Clerk key:{CLERK_PUBLISHABLE_KEY}")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -72,6 +75,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    'recommenderx.middleware.ClerkAuthMiddleware',
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -89,6 +93,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "recommenderx.context_processors.clerk_settings",
             ],
         },
     },

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign Up | RecommenderX{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Create an Account</h4>
+            </div>
+            <div class="card-body">
+                <div id="clerk-sign-up" style="min-height: 500px;"></div>
+                
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        console.log("Signup page loaded");
+                        
+                        // Get the publishable key
+                        const clerkPublishableKey = "{{ CLERK_PUBLISHABLE_KEY }}";
+                        console.log("Clerk key:", clerkPublishableKey);
+                        
+                        if (!clerkPublishableKey) {
+                            console.error("Clerk publishable key is missing");
+                            document.getElementById('clerk-sign-up').innerHTML = 
+                                '<div class="alert alert-danger">Authentication service configuration error: Missing API key</div>';
+                            return;
+                        }
+                        
+                        // Add Clerk script with a different approach
+                        const clerkScript = document.createElement('script');
+                        clerkScript.setAttribute('data-clerk-publishable-key', clerkPublishableKey);
+                        clerkScript.async = true;
+                        clerkScript.crossOrigin = 'anonymous';
+                        clerkScript.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js';
+                        
+                        // Add a separate script to handle Clerk initialization
+                        const initScript = document.createElement('script');
+                        initScript.innerHTML = `
+                            window.addEventListener('load', async function() {
+                                try {
+                                    // Wait for Clerk to be available globally
+                                    if (window.Clerk) {
+                                        console.log("Clerk global object found");
+                                        
+                                        // Initialize Clerk
+                                        await window.Clerk.load({
+                                            // Configuration
+                                            signInUrl: '/login/',
+                                            signUpUrl: '/signup/',
+                                            afterSignInUrl: '/',
+                                            afterSignUpUrl: '/'
+                                        });
+                                        
+                                        console.log("Clerk initialized successfully");
+                                        
+                                        // Render the sign-up UI
+                                        const signUpDiv = document.getElementById('clerk-sign-up');
+                                        window.Clerk.openSignUp({
+                                            container: signUpDiv,
+                                            signInUrl: '/login/'
+                                        });
+                                        console.log("Sign-up UI rendered");
+                                    } else {
+                                        console.error("Clerk global object not found");
+                                        document.getElementById('clerk-sign-up').innerHTML = 
+                                            '<div class="alert alert-danger">Authentication service not available. Please try again later.</div>';
+                                    }
+                                } catch (error) {
+                                    console.error("Error initializing Clerk:", error);
+                                    document.getElementById('clerk-sign-up').innerHTML = 
+                                        '<div class="alert alert-danger">Error initializing authentication service: ' + error.message + '</div>';
+                                }
+                            });
+                        `;
+                        
+                        // Add scripts to document
+                        document.head.appendChild(clerkScript);
+                        document.head.appendChild(initScript);
+                    });
+                </script>
+                
+                <div class="mt-3 text-center">
+                    <p>Already have an account? <a href="/login/">Login</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
