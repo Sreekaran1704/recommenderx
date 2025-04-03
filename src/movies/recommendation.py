@@ -1,76 +1,61 @@
-import numpy as np
-from django.contrib.auth.models import User
-from .models import Movie, Rating
-from sklearn.metrics.pairwise import cosine_similarity
+from django.apps import apps
 
 def get_recommendations(user_id, num_recommendations=5):
     """
-    Generate movie recommendations for a user using collaborative filtering.
-    
-    Args:
-        user_id: The ID of the user to generate recommendations for
-        num_recommendations: Number of recommendations to return
-        
-    Returns:
-        List of recommended movie objects
+    Generate movie recommendations for a user.
     """
-    # Get all ratings
-    ratings = Rating.objects.all()
+    # Get model classes using apps.get_model
+    Movie = apps.get_model('movies', 'Movie')
+    Rating = apps.get_model('movies', 'Rating')
     
-    # Get all users and movies
-    users = User.objects.all()
-    movies = Movie.objects.all()
-    
-    # Create user-movie matrix
-    user_movie_matrix = np.zeros((users.count(), movies.count()))
-    
-    # Fill the matrix with ratings
-    user_indices = {user.id: i for i, user in enumerate(users)}
-    movie_indices = {movie.id: i for i, movie in enumerate(movies)}
-    
-    for rating in ratings:
-        user_idx = user_indices.get(rating.user.id)
-        movie_idx = movie_indices.get(rating.movie.id)
-        if user_idx is not None and movie_idx is not None:
-            user_movie_matrix[user_idx, movie_idx] = rating.rating
-    
-    # Calculate user similarity
-    user_similarity = cosine_similarity(user_movie_matrix)
-    
-    # Get the user index
-    user_idx = user_indices.get(user_id)
-    if user_idx is None:
-        return []
-    
-    # Get similar users
-    similar_users = user_similarity[user_idx]
-    
-    # Get the user's rated movies
-    user_ratings = Rating.objects.filter(user_id=user_id)
-    rated_movie_ids = [rating.movie.id for rating in user_ratings]
-    
-    # Calculate predicted ratings for unrated movies
-    recommendations = []
-    
-    for movie in movies:
-        if movie.id not in rated_movie_ids:
-            movie_idx = movie_indices.get(movie.id)
-            if movie_idx is not None:
-                # Calculate weighted rating
-                weighted_sum = 0
-                similarity_sum = 0
-                
-                for other_user_idx, similarity in enumerate(similar_users):
-                    if similarity > 0 and other_user_idx != user_idx:
-                        rating = user_movie_matrix[other_user_idx, movie_idx]
-                        if rating > 0:
-                            weighted_sum += similarity * rating
-                            similarity_sum += similarity
-                
-                if similarity_sum > 0:
-                    predicted_rating = weighted_sum / similarity_sum
-                    recommendations.append((movie, predicted_rating))
-    
-    # Sort by predicted rating and return top N
-    recommendations.sort(key=lambda x: x[1], reverse=True)
-    return [movie for movie, _ in recommendations[:num_recommendations]]
+    try:
+        # Get popular movies as fallback
+        popular_movies = list(Movie.objects.all()[:num_recommendations])
+        
+        # Check if we have any ratings at all
+        if Rating.objects.count() == 0:
+            return popular_movies
+        
+        # Check if this user has any ratings
+        user_ratings = Rating.objects.filter(user_id=user_id)
+        if not user_ratings.exists():
+            return popular_movies
+            
+        # Get movies this user has already rated
+        rated_movie_ids = [rating.movie_id for rating in user_ratings]
+        
+        # Find users with similar tastes
+        # Get all users who rated at least one movie that this user rated
+        similar_user_ratings = Rating.objects.filter(movie_id__in=rated_movie_ids).exclude(user_id=user_id)
+        similar_user_ids = similar_user_ratings.values_list('user_id', flat=True).distinct()
+        
+        # Get movies rated highly by similar users that this user hasn't rated yet
+        recommended_movies = Rating.objects.filter(
+            user_id__in=similar_user_ids,
+            rating__gte=4  # Only consider high ratings (4 or 5)
+        ).exclude(
+            movie_id__in=rated_movie_ids
+        ).values_list('movie_id', flat=True).distinct()
+        
+        # Get the actual movie objects
+        recommendations = list(Movie.objects.filter(id__in=recommended_movies)[:num_recommendations])
+        
+        # If we don't have enough recommendations, add some popular movies
+        if len(recommendations) < num_recommendations:
+            # Get IDs of movies we already recommended
+            recommended_ids = [movie.id for movie in recommendations]
+            
+            # Add popular movies not already in recommendations
+            additional_movies = list(Movie.objects.exclude(
+                id__in=recommended_ids + rated_movie_ids
+            )[:num_recommendations - len(recommendations)])
+            
+            # Combine the recommendations
+            recommendations = recommendations + additional_movies
+        
+        return recommendations
+        
+    except Exception as e:
+        # If anything goes wrong, return some popular movies
+        print(f"Error in recommendation system: {str(e)}")
+        return list(Movie.objects.all()[:num_recommendations])

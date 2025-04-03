@@ -2,5 +2,12 @@ from django.apps import AppConfig
 
 
 class MoviesConfig(AppConfig):
-    default_auto_field = "django.db.models.BigAutoField"
-    name = "movies"
+    name = 'movies'
+    
+    @property
+    def default_auto_field(self):
+        return 'django.db.models.BigAutoField'
+    
+    def ready(self):
+        # This will ensure models are properly loaded when the app is ready
+        pass

@@ -4,6 +4,7 @@ import requests
 import json
 from django.contrib import messages
 from django.conf import settings
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 def home_page_view(request, *args, **kwargs):
 
@@ -15,7 +16,8 @@ def movie_list_view(request):
 
     search_query = request.GET.get('q', '')
     genre_filter = request.GET.get('genre', '')
-
+    sort_by = request.GET.get('sort', 'title')  # Default sort by title
+    
     # Make API request to our backend
     if search_query:
         response = requests.get(f'http://localhost:8000/api/movies/search/?q={search_query}')
@@ -29,13 +31,38 @@ def movie_list_view(request):
         response = requests.get('http://localhost:8000/api/movies/')
         movies = response.json()
     
+    # Sort movies based on user preference
+    if sort_by == 'title':
+        movies = sorted(movies, key=lambda x: x.get('title', '').lower())
+    elif sort_by == 'rating':
+        # Assuming movies have an average_rating field
+        movies = sorted(movies, key=lambda x: x.get('average_rating', 0), reverse=True)
+    elif sort_by == 'release_date':
+        # Sort by release date (newest first)
+        movies = sorted(movies, key=lambda x: x.get('release_date', ''), reverse=True)
+    
     # Get genres for filter dropdown
     genres_response = requests.get('http://localhost:8000/api/movies/genres/')
     genres = genres_response.json().get('genres', [])
     
+    # Pagination
+    page = request.GET.get('page', 1)
+    paginator = Paginator(movies, 12)  # Show 12 movies per page
+    
+    try:
+        movies_page = paginator.page(page)
+    except PageNotAnInteger:
+        movies_page = paginator.page(1)
+    except EmptyPage:
+        movies_page = paginator.page(paginator.num_pages)
+    
     return render(request, 'movies/movie_list.html', {
-        'movies': movies,
-        'genres': genres
+        'movies': movies_page,
+        'genres': genres,
+        'current_genre': genre_filter,
+        'search_query': search_query,
+        'sort_by': sort_by,
+        'page_obj': movies_page,  # For pagination template
     })
 
 def movie_detail_view(request, movie_id):

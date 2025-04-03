@@ -6,25 +6,25 @@ from .auth import ClerkJWTAuthentication
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.models import User
 import json
-from .models import Movie, Rating, Watchlist
-from .recommendation import get_recommendations
-from users.models import UserProfile
 from rest_framework import status
+from django.apps import apps
+
+# Remove direct model imports and use apps.get_model consistently
 
 @api_view(['GET'])
 @authentication_classes([ClerkJWTAuthentication])
 @permission_classes([IsAuthenticated])
-
 def get_movie_recommendations(request):
     try:
-        # Get the user profile from Clerk user ID
-        clerk_user_id = request.user.get('id')
-        user_profile = UserProfile.objects.get(clerk_user_id=clerk_user_id)
+        # Import recommendation function
+        from .recommendation import get_recommendations
         
-        # Get recommendations
-        recommended_movies = get_recommendations(user_profile.user.id)
+        # Get the user ID directly from Clerk authentication
+        clerk_user_id = request.user.get('id')
+        
+        # Get recommendations using the Clerk user ID
+        recommended_movies = get_recommendations(clerk_user_id)
         
         # Serialize the movies
         movies_data = []
@@ -39,42 +39,84 @@ def get_movie_recommendations(request):
         
         return Response({"recommendations": movies_data})
     
-    except UserProfile.DoesNotExist:
-        return Response({"error": "User profile not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['GET'])  # Add these decorators to protected_view
+@api_view(['GET'])
 @authentication_classes([ClerkJWTAuthentication])
 @permission_classes([IsAuthenticated])
 def protected_view(request):
     return Response({"message": "This is a protected view. You are authenticated!"})
+
 def movie_list(request):
-    movies = Movie.objects.all().values()
-    return JsonResponse(list(movies), safe=False)
+    Movie = apps.get_model('movies', 'Movie')
+    movies = list(Movie.objects.all().values())
+    return JsonResponse(movies, safe=False)
 
 def movie_detail(request, movie_id):
+    Movie = apps.get_model('movies', 'Movie')
     movie = get_object_or_404(Movie, id=movie_id)
-    return JsonResponse({"title": movie.title, "genre": movie.genre, "poster_url": movie.poster_url, "description": movie.description})
+    return JsonResponse({
+        "title": movie.title, 
+        "genre": movie.genre, 
+        "poster_url": movie.poster_url, 
+        "description": movie.description
+    })
 
 @csrf_exempt
 def add_rating(request):
     if request.method == 'POST':
+        Movie = apps.get_model('movies', 'Movie')
+        Rating = apps.get_model('movies', 'Rating')
+        
         data = json.loads(request.body)
-        user = get_object_or_404(User, id=data['user_id'])
-        movie = get_object_or_404(Movie, id=data['movie_id'])
-        rating = Rating.objects.create(user=user, movie=movie, rating=data['rating'], review=data.get('review', ''))
+        user_id = data.get('user_id')
+        movie_id = data.get('movie_id')
+        rating_value = data.get('rating')
+        review = data.get('review', '')
+        user_name = data.get('user_name', '')
+        user_email = data.get('user_email', '')
+        
+        if not user_id or not movie_id or not rating_value:
+            return JsonResponse({"error": "User ID, movie ID, and rating are required"}, status=400)
+            
+        movie = get_object_or_404(Movie, id=movie_id)
+        
+        rating, created = Rating.objects.update_or_create(
+            user_id=user_id,
+            movie=movie,
+            defaults={
+                'rating': rating_value,
+                'review': review,
+                'user_name': user_name,
+                'user_email': user_email
+            }
+        )
+        
         return JsonResponse({"message": "Rating added successfully", "rating_id": rating.id})
     return JsonResponse({"error": "Invalid request"}, status=400)
 
 @csrf_exempt
 def create_watchlist(request):
     if request.method == 'POST':
+        Movie = apps.get_model('movies', 'Movie')
+        Watchlist = apps.get_model('movies', 'Watchlist')
+        
         data = json.loads(request.body)
-        user = get_object_or_404(User, id=data['user_id'])
-        watchlist, created = Watchlist.objects.get_or_create(user=user)
-        movie = get_object_or_404(Movie, id=data['movie_id'])
-        watchlist.movies.add(movie)
+        user_id = data.get('user_id')
+        movie_id = data.get('movie_id')
+        
+        if not user_id or not movie_id:
+            return JsonResponse({"error": "Both user_id and movie_id are required"}, status=400)
+            
+        movie = get_object_or_404(Movie, id=movie_id)
+        
+        # Create or get watchlist entry
+        watchlist, created = Watchlist.objects.get_or_create(
+            user_id=user_id,
+            movie=movie
+        )
+        
         return JsonResponse({"message": "Movie added to watchlist"})
     return JsonResponse({"error": "Invalid request"}, status=400)
 
@@ -83,46 +125,47 @@ def create_watchlist(request):
 @permission_classes([IsAuthenticated])
 def remove_from_watchlist(request):
     try:
+        Movie = apps.get_model('movies', 'Movie')
+        Watchlist = apps.get_model('movies', 'Watchlist')
+        
         movie_id = request.data.get('movie_id')
         if not movie_id:
             return Response({"error": "Movie ID is required"}, status=status.HTTP_400_BAD_REQUEST)
             
-        # Get the user profile from Clerk user ID
+        # Get the user ID from Clerk authentication
         clerk_user_id = request.user.get('id')
-        user_profile = UserProfile.objects.get(clerk_user_id=clerk_user_id)
         
-        # Get watchlist
+        # Find the watchlist entry
         try:
-            watchlist = Watchlist.objects.get(user=user_profile.user)
             movie = Movie.objects.get(id=movie_id)
-            watchlist.movies.remove(movie)
+            watchlist_entry = Watchlist.objects.get(user_id=clerk_user_id, movie=movie)
+            watchlist_entry.delete()
             return Response({"message": "Movie removed from watchlist successfully"})
         except Watchlist.DoesNotExist:
-            return Response({"error": "Watchlist not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Movie not in watchlist"}, status=status.HTTP_404_NOT_FOUND)
         
-    except UserProfile.DoesNotExist:
-        return Response({"error": "User profile not found"}, status=status.HTTP_404_NOT_FOUND)
     except Movie.DoesNotExist:
         return Response({"error": "Movie not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 @api_view(['GET'])
 @authentication_classes([ClerkJWTAuthentication])
 @permission_classes([IsAuthenticated])
 def get_user_watchlist(request):
     try:
-        # Get the user profile from Clerk user ID
-        clerk_user_id = request.user.get('id')
-        user_profile = UserProfile.objects.get(clerk_user_id=clerk_user_id)
+        Watchlist = apps.get_model('movies', 'Watchlist')
         
-        # Get or create watchlist
-        watchlist, created = Watchlist.objects.get_or_create(user=user_profile.user)
+        # Get the user ID from Clerk authentication
+        clerk_user_id = request.user.get('id')
+        
+        # Get watchlist items for this user
+        watchlist_items = Watchlist.objects.filter(user_id=clerk_user_id)
         
         # Serialize the watchlist movies
         movies_data = []
-        for movie in watchlist.movies.all():
+        for item in watchlist_items:
+            movie = item.movie
             movies_data.append({
                 "id": movie.id,
                 "title": movie.title,
@@ -133,14 +176,14 @@ def get_user_watchlist(request):
         
         return Response({"watchlist": movies_data})
     
-    except UserProfile.DoesNotExist:
-        return Response({"error": "User profile not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 def search_movies(request):
     try:
+        Movie = apps.get_model('movies', 'Movie')
+        
         query = request.query_params.get('q', '')
         if not query:
             return Response({"error": "Search query is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -172,6 +215,9 @@ def search_movies(request):
 @permission_classes([IsAuthenticated])
 def update_rating(request):
     try:
+        Movie = apps.get_model('movies', 'Movie')
+        Rating = apps.get_model('movies', 'Rating')
+        
         movie_id = request.data.get('movie_id')
         new_rating = request.data.get('rating')
         new_review = request.data.get('review', '')
@@ -179,25 +225,27 @@ def update_rating(request):
         if not movie_id or not new_rating:
             return Response({"error": "Movie ID and rating are required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Get the user profile from Clerk user ID
+        # Get the user ID from Clerk authentication
         clerk_user_id = request.user.get('id')
-        user_profile = UserProfile.objects.get(clerk_user_id=clerk_user_id)
         
         # Find the existing rating
         try:
-            rating = Rating.objects.get(user=user_profile.user, movie_id=movie_id)
-            
-            # Update the rating
-            rating.rating = new_rating
-            rating.review = new_review
-            rating.save()
+            movie = Movie.objects.get(id=movie_id)
+            rating, created = Rating.objects.update_or_create(
+                user_id=clerk_user_id,
+                movie=movie,
+                defaults={
+                    'rating': new_rating,
+                    'review': new_review,
+                    'user_name': request.user.get('first_name', '') + ' ' + request.user.get('last_name', ''),
+                    'user_email': request.user.get('email_addresses', [{}])[0].get('email_address', '')
+                }
+            )
             
             return Response({"message": "Rating updated successfully"})
-        except Rating.DoesNotExist:
-            return Response({"error": "Rating not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Movie.DoesNotExist:
+            return Response({"error": "Movie not found"}, status=status.HTTP_404_NOT_FOUND)
         
-    except UserProfile.DoesNotExist:
-        return Response({"error": "User profile not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -206,12 +254,13 @@ def update_rating(request):
 @permission_classes([IsAuthenticated])
 def get_user_ratings(request):
     try:
-        # Get the user profile from Clerk user ID
+        Rating = apps.get_model('movies', 'Rating')
+        
+        # Get the user ID from Clerk authentication
         clerk_user_id = request.user.get('id')
-        user_profile = UserProfile.objects.get(clerk_user_id=clerk_user_id)
         
         # Get all ratings by this user
-        ratings = Rating.objects.filter(user=user_profile.user)
+        ratings = Rating.objects.filter(user_id=clerk_user_id)
         
         # Serialize the ratings
         ratings_data = []
@@ -231,14 +280,15 @@ def get_user_ratings(request):
         
         return Response({"ratings": ratings_data})
     
-    except UserProfile.DoesNotExist:
-        return Response({"error": "User profile not found"}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 def get_movie_ratings(request, movie_id):
     try:
+        Movie = apps.get_model('movies', 'Movie')
+        Rating = apps.get_model('movies', 'Rating')
+        
         # Get the movie
         movie = get_object_or_404(Movie, id=movie_id)
         
@@ -259,7 +309,7 @@ def get_movie_ratings(request, movie_id):
         for rating in ratings:
             ratings_data.append({
                 "id": rating.id,
-                "user": rating.user.username,
+                "user": rating.user_name or rating.user_id,  # Use user_name if available, otherwise user_id
                 "rating": rating.rating,
                 "review": rating.review,
                 "created_at": rating.created_at.isoformat() if hasattr(rating, 'created_at') else None
@@ -286,6 +336,8 @@ def get_movie_ratings(request, movie_id):
 @api_view(['GET'])
 def get_movies_by_genre(request, genre):
     try:
+        Movie = apps.get_model('movies', 'Movie')
+        
         # Get all movies with the specified genre
         movies = Movie.objects.filter(genre__icontains=genre)
         
@@ -315,6 +367,8 @@ def get_movies_by_genre(request, genre):
 @api_view(['GET'])
 def get_all_genres(request):
     try:
+        Movie = apps.get_model('movies', 'Movie')
+        
         # Get all unique genres from the movies
         all_genres = Movie.objects.values_list('genre', flat=True).distinct()
         
