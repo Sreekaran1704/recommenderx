@@ -191,5 +191,98 @@
         }
     }
 </script>
+<!-- Add this script right before the closing </body> tag -->
+<!-- Replace the existing storeBackendJWT function with this version -->
+<script>
+  async function storeBackendJWT() {
+    console.log("Attempting to get backend token...");
+    try {
+      if (window.Clerk && window.Clerk.session) {
+        console.log("Clerk session found, requesting backend token...");
+        
+        // Make sure we're explicitly requesting a backend JWT token
+        const token = await window.Clerk.session.getToken({ template: "backend" });
+        console.log("Token received:", token ? "Yes (length: " + token.length + ")" : "No");
+        
+        if (token) {
+          // Check if it's a proper JWT
+          if (token.startsWith('eyJ')) {
+            console.log("Valid JWT format detected");
+            
+            // Delete any existing clerk_token cookie first
+            document.cookie = "clerk_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            
+            // Set the new token without Secure flag for local development
+            document.cookie = `clerk_token=${token}; path=/;`;
+            console.log("clerk_token cookie set successfully");
+            
+            // Check if cookie was actually set
+            setTimeout(() => {
+              const allCookies = document.cookie;
+              console.log("All cookies after setting:", allCookies);
+              if (allCookies.includes('clerk_token=')) {
+                console.log("clerk_token cookie confirmed in document.cookie");
+              } else {
+                console.error("clerk_token cookie not found in document.cookie!");
+              }
+            }, 100);
+            
+            // Force reload only if token wasn't set before
+            if (!sessionStorage.getItem('clerk_token_set')) {
+              sessionStorage.setItem('clerk_token_set', 'true');
+              console.log("Reloading page to apply new token...");
+              setTimeout(() => window.location.reload(), 500);
+            }
+          } else {
+            console.error("Token is not in JWT format:", token.substring(0, 10) + "...");
+          }
+        } else {
+          console.error("No backend token received from Clerk.");
+        }
+      } else {
+        console.error("Clerk or Clerk.session not available.");
+      }
+    } catch(e) {
+      console.error("Error fetching backend token:", e);
+      console.error(e.stack);
+    }
+  }
+  
+  // Call the function when Clerk is ready
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log("DOM loaded, checking for Clerk...");
+    
+    // Try to set up a listener for when Clerk becomes available
+    const checkClerk = setInterval(() => {
+      if (window.Clerk) {
+        console.log("Clerk found, setting up listener");
+        clearInterval(checkClerk);
+        
+        window.Clerk.addListener(({ user }) => {
+          console.log("Clerk listener triggered, user:", user ? "Yes" : "No");
+          if (user) {
+            console.log("User signed in, getting backend token...");
+            storeBackendJWT();
+          }
+        });
+        
+        // Also try immediately if session exists
+        if (window.Clerk.session) {
+          console.log("Clerk session already exists, getting token immediately");
+          storeBackendJWT();
+        }
+      }
+    }, 500);
+  });
+  
+  // Also try on window load
+  window.addEventListener("load", () => {
+    console.log("Window loaded, checking for Clerk session...");
+    if (window.Clerk && window.Clerk.session) {
+      console.log("Clerk session found on window load");
+      storeBackendJWT();
+    }
+  });
+</script>
 </body>
 </html>

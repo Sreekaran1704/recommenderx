@@ -1,11 +1,113 @@
 {% extends 'base.html' %}
 
+{% block extra_css %}
+<style>
+    .section-title {
+        font-size: 1.8rem;
+        font-weight: 800;
+        margin-bottom: 1rem;
+        color: #fff;
+        background: linear-gradient(to right, #ff5f6d, #ffc371);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .horizontal-scroll {
+        display: flex;
+        gap: 1rem;
+        overflow-x: auto;
+        padding-bottom: 10px;
+        scroll-snap-type: x mandatory;
+    }
+
+    .movie-card-horizontal {
+        min-width: 200px;
+        flex: 0 0 auto;
+        background: rgba(255, 255, 255, 0.07);
+        backdrop-filter: blur(6px);
+        border-radius: 20px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+        scroll-snap-align: start;
+    }
+
+    .movie-card-horizontal:hover {
+        transform: scale(1.05);
+        box-shadow: 0 12px 30px rgba(255, 99, 132, 0.3);
+    }
+
+    .movie-poster-sm {
+        width: 100%;
+        height: 250px;
+        object-fit: cover;
+        border-radius: 20px 20px 0 0;
+    }
+
+    .movie-body {
+        padding: 0.75rem 1rem;
+    }
+
+    .btn-zen {
+        background: linear-gradient(to right, #ff416c, #ff4b2b);
+        border: none;
+        color: white;
+        font-weight: 600;
+        border-radius: 30px;
+        padding: 0.5rem 1rem;
+        transition: all 0.3s;
+    }
+
+    .btn-zen:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(255, 105, 135, 0.5);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="jumbotron">
-    <h1 class="display-4">Welcome to RecommenderX</h1>
-    <p class="lead">Discover new movies based on your preferences and ratings.</p>
-    <hr class="my-4">
-    <p>Browse our collection of movies, rate them, and get personalized recommendations.</p>
-    <a class="btn btn-primary btn-lg" href="/movies/" role="button">Browse Movies</a>
+<div class="mb-5 text-center">
+    <h1 class="display-4 fw-bold text-gradient">🎬 Welcome to RecommenderX</h1>
+    <p class="lead">Stream the best. Rate smart. Get 🔥 recommendations!</p>
+    <a href="/movies/" class="btn btn-zen btn-lg mt-2">Browse All Movies</a>
 </div>
+
+<!-- Trending Movies Section -->
+<h2 class="section-title">🔥 Trending Now</h2>
+<div class="horizontal-scroll">
+    {% for movie in trending_movies %}
+    <div class="movie-card-horizontal">
+        <a href="{% url 'movie_detail' movie.id %}">
+            <img src="{{ movie.poster_url }}" class="movie-poster-sm" alt="{{ movie.title }}">
+        </a>
+        <div class="movie-body">
+            <h6 class="mb-1 fw-bold">{{ movie.title }}</h6>
+            <p class="text-muted small mb-1">{{ movie.genre }}</p>
+            <a href="{% url 'movie_detail' movie.id %}" class="btn btn-sm btn-zen w-100">Details</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Recommendations Section -->
+{% if recommended_movies %}
+<h2 class="section-title mt-5">🎯 Recommended for You</h2>
+<div class="horizontal-scroll">
+    {% for movie in recommended_movies %}
+    <div class="movie-card-horizontal">
+        <a href="{% url 'movie_detail' movie.id %}">
+            <img src="{{ movie.poster_url }}" class="movie-poster-sm" alt="{{ movie.title }}">
+        </a>
+        <div class="movie-body">
+            <h6 class="mb-1 fw-bold">{{ movie.title }}</h6>
+            <p class="text-muted small mb-1">{{ movie.genre }}</p>
+            <a href="{% url 'movie_detail' movie.id %}" class="btn btn-sm btn-zen w-100">Details</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info mt-4">
+    <strong>⚡ Psst!</strong> Start rating movies to get personalized recommendations.
+</div>
+{% endif %}
 {% endblock %}

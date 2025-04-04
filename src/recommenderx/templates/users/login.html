@@ -10,11 +10,41 @@
                 <h4 class="mb-0">Login</h4>
             </div>
             <div class="card-body">
+                <!-- Add a message for users who are already logged in -->
+                <div id="already-signed-in" style="display: none;" class="alert alert-info">
+                    <p>You are already signed in! Redirecting to home page...</p>
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <div id="clerk-sign-in" style="min-height: 500px;"></div>
                 
                 <script>
                     document.addEventListener('DOMContentLoaded', function() {
                         console.log("Login page loaded");
+                        
+                        // Check if user is already signed in
+                        if (window.Clerk && window.Clerk.user) {
+                            console.log("User already signed in, getting token and redirecting");
+                            document.getElementById('clerk-sign-in').style.display = 'none';
+                            document.getElementById('already-signed-in').style.display = 'block';
+                            
+                            // Get and store the token
+                            getAndStoreToken().then(() => {
+                                // Get redirect URL from query params or default to home
+                                const urlParams = new URLSearchParams(window.location.search);
+                                const redirectUrl = urlParams.get('redirect') || '/';
+                                
+                                // Redirect after a short delay
+                                setTimeout(() => {
+                                    window.location.href = redirectUrl;
+                                }, 1500);
+                            });
+                            return;
+                        }
                         
                         // Get the publishable key from template
                         const templateKey = "{{ CLERK_PUBLISHABLE_KEY }}";
@@ -45,39 +75,116 @@
                                             afterSignUpUrl: '/'
                                         });
                                         
-                                        console.log("Clerk initialized successfully");
-                                        
-                                        // Render the sign-in UI
+                                        // Mount the sign-in component
                                         const signInDiv = document.getElementById('clerk-sign-in');
-                                        window.Clerk.openSignIn({
-                                            container: signInDiv,
-                                            signUpUrl: '/signup/'
+                                        if (signInDiv) {
+                                            window.Clerk.mountSignIn(signInDiv);
+                                            console.log("Sign-in component mounted");
+                                        }
+                                        
+                                        // Set up listener for authentication changes
+                                        window.Clerk.addListener(({ user }) => {
+                                            if (user) {
+                                                console.log("User authenticated, getting token");
+                                                getAndStoreToken();
+                                            }
                                         });
-                                        console.log("Sign-in UI rendered");
                                     } else {
-                                        console.error("Clerk global object not found");
-                                        document.getElementById('clerk-sign-in').innerHTML = 
-                                            '<div class="alert alert-danger">Authentication service not available. Please try again later.</div>';
+                                        console.error("Clerk not found on window");
                                     }
                                 } catch (error) {
                                     console.error("Error initializing Clerk:", error);
-                                    document.getElementById('clerk-sign-in').innerHTML = 
-                                        '<div class="alert alert-danger">Error initializing authentication service: ' + error.message + '</div>';
                                 }
                             });
                         `;
                         
-                        // Add scripts to document
+                        // Append scripts to document
                         document.head.appendChild(clerkScript);
                         document.head.appendChild(initScript);
                     });
+                    
+                    // Function to get and store the token
+                    async function getAndStoreToken() {
+                        try {
+                            console.log("Getting backend token...");
+                            if (window.Clerk && window.Clerk.session) {
+                                const token = await window.Clerk.session.getToken({ template: "backend" });
+                                if (token) {
+                                    console.log("Got token, length:", token.length);
+                                    console.log("Token starts with:", token.substring(0, 10));
+                                    
+                                    // Clear any existing token
+                                    document.cookie = "clerk_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                                    
+                                    // Set the token without Secure flag for local development
+                                    document.cookie = `clerk_token=${token}; path=/;`;
+                                    
+                                    console.log("Token stored in cookie");
+                                    return true;
+                                } else {
+                                    console.error("No token received from Clerk");
+                                }
+                            } else {
+                                console.error("Clerk session not available");
+                            }
+                        } catch (error) {
+                            console.error("Error getting token:", error);
+                        }
+                        return false;
+                    }
                 </script>
-                
-                <div class="mt-3 text-center">
-                    <p>Don't have an account? <a href="/signup/">Sign Up</a></p>
-                </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
+
+<!-- Add this script right before the closing </body> tag or at the end of your existing script -->
+<script>
+  async function storeBackendJWT() {
+    try {
+      console.log("Attempting to get backend JWT token...");
+      const token = await window.Clerk.session.getToken({ template: "backend" });
+      if (token) {
+        console.log("Got JWT token, storing as clerk_token cookie");
+        <!-- Around line 93, change this line: -->
+        document.cookie = `clerk_token=${token}; path=/; Secure`;
+        
+        <!-- To this: -->
+        document.cookie = `clerk_token=${token}; path=/;`;
+      } else {
+        console.log("No token received from Clerk");
+      }
+    } catch (error) {
+      console.error("Error getting JWT token:", error);
+    }
+  }
+
+  if (window.Clerk) {
+    window.Clerk.addListener(storeBackendJWT);
+  }
+
+  window.addEventListener("load", () => {
+    if (window.Clerk && window.Clerk.session) {
+      storeBackendJWT();
+    }
+  });
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Store the redirect URL
+        const redirectUrl = "{{ redirect_url }}";
+        
+        // Check if Clerk is available
+        if (typeof Clerk !== 'undefined') {
+            // Listen for authentication changes
+            Clerk.addListener(({ user }) => {
+                if (user) {
+                    // User is authenticated, redirect to the stored URL
+                    window.location.href = redirectUrl;
+                }
+            });
+        }
+    });
+</script>

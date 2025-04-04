@@ -379,3 +379,43 @@ def get_all_genres(request):
     
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@authentication_classes([ClerkJWTAuthentication])
+@permission_classes([IsAuthenticated])
+def create_rating(request):
+    try:
+        Movie = apps.get_model('movies', 'Movie')
+        Rating = apps.get_model('movies', 'Rating')
+        
+        movie_id = request.data.get('movie_id')
+        rating_value = request.data.get('rating')
+        review = request.data.get('review', '')
+        
+        if not movie_id or not rating_value:
+            return Response({"error": "Movie ID and rating are required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the user ID from authentication
+        user_id = request.user.id
+        
+        # Find or create the movie rating
+        try:
+            movie = Movie.objects.get(id=movie_id)
+            rating, created = Rating.objects.update_or_create(
+                user_id=user_id,
+                movie=movie,
+                defaults={
+                    'rating': rating_value,
+                    'review': review,
+                    'user_name': getattr(request.user, 'first_name', '') + ' ' + getattr(request.user, 'last_name', ''),
+                    'user_email': getattr(request.user, 'email', '')
+                }
+            )
+            
+            return Response({"message": "Rating created successfully"}, status=status.HTTP_201_CREATED)
+        except Movie.DoesNotExist:
+            return Response({"error": "Movie not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
