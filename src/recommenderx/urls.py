@@ -1,6 +1,10 @@
 from django.contrib import admin
 from django.urls import include, path
-from .views import home_page_view, movie_list_view, movie_detail_view, recommendations_view, watchlist_view, add_to_watchlist_view, login_view, signup_view, logout_view, profile_view, add_rating_view
+from .views import (
+    home_page_view, movie_list_view, movie_detail_view, recommendations_view, 
+    watchlist_view, add_to_watchlist_view, remove_from_watchlist_view, 
+    login_view, signup_view, logout_view, profile_view, add_rating_view
+)
 from rest_framework.documentation import include_docs_urls
 
 urlpatterns = [
@@ -13,6 +17,7 @@ urlpatterns = [
     # User-specific pages
     path("watchlist/", watchlist_view, name="watchlist"),
     path("watchlist/add/", add_to_watchlist_view, name="add_to_watchlist"),
+    path("watchlist/remove/", remove_from_watchlist_view, name="remove_from_watchlist"),
     path("ratings/add/", add_rating_view, name="add_rating"),        
     # Authentication routes
     path("login/", login_view, name="login"),

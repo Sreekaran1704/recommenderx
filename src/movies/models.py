@@ -44,24 +44,14 @@ class Rating(models.Model):
         return f"{display_name} - {movie_title} - {rating_value}"
 
 class Watchlist(models.Model):
-    # Store Clerk user ID
     user_id = models.CharField(max_length=255, null=True, blank=True)
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='watchlists')
+    title = models.CharField(max_length=255, blank=True, null=True)
+    poster_url = models.URLField(max_length=500, blank=True, null=True)
     added_at = models.DateTimeField(auto_now_add=True)
-
+    
     class Meta:
-        # Ensure a movie is only in a user's watchlist once
         unique_together = ('user_id', 'movie')
-
-    def __str__(self):
-        user = getattr(self, 'user_id', 'Unknown User')
         
-        try:
-            if hasattr(self, 'movie') and self.movie is not None:
-                movie_title = getattr(self.movie, 'title', 'Unknown Movie')
-            else:
-                movie_title = 'Unknown Movie'
-        except:
-            movie_title = 'Unknown Movie'
-            
-        return f"{user} - {movie_title}"
+    def __str__(self):
+        return f"{self.user_id} - {self.movie.title if self.movie else 'Unknown'}"

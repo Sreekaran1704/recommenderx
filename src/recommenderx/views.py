@@ -192,19 +192,58 @@ def recommendations_view(request):
     })
 
 def watchlist_view(request):
-    # In a real app, this would use the authenticated user
-    # For now, we'll just show a message
-    return render(request, 'movies/watchlist.html', {
-        'movies': []
-    })
-
-def add_to_watchlist_view(request):
-    if request.method == 'POST':
-        movie_id = request.POST.get('movie_id')
-        # In a real app, this would add the movie to the user's watchlist
-        # For now, we'll just redirect back
-        return redirect(f'/movies/{movie_id}/')
-    return redirect('/movies/')
+    # Get the Clerk token
+    clerk_token = (
+        request.COOKIES.get('clerk_token') or
+        request.COOKIES.get('__clerk_db_jwt') or
+        request.COOKIES.get('__session') or
+        request.headers.get('Authorization', '').replace('Bearer ', '')
+    )
+    
+    if not clerk_token:
+        # Redirect to login if not authenticated
+        request.session['redirect_after_login'] = '/watchlist/'
+        return redirect('/login/')
+    
+    try:
+        # Get the Django user for this Clerk user
+        import hashlib
+        from django.contrib.auth.models import User
+        
+        hash_object = hashlib.md5(clerk_token.encode())
+        username = f"clerk_{hash_object.hexdigest()[:8]}"
+        
+        user = User.objects.get(username=username)
+        
+        # Get the user's watchlist
+        from movies.models import Watchlist
+        watchlist_items = Watchlist.objects.filter(user_id=user.id)
+        
+        # Format the watchlist items for the template
+        movies = []
+        for item in watchlist_items:
+            movies.append({
+                'id': item.movie.id,
+                'title': item.movie.title,
+                'genre': item.movie.genre,
+                'description': item.movie.description,
+                'poster_url': item.movie.poster_url,
+                'watchlist_id': item.id,  # For removal functionality
+            })
+        
+        return render(request, 'movies/watchlist.html', {
+            'movies': movies,
+            'is_authenticated': True,
+        })
+        
+    except Exception as e:
+        print(f"Error getting watchlist: {str(e)}")
+        messages.error(request, "Error retrieving your watchlist.")
+        return render(request, 'movies/watchlist.html', {
+            'movies': [],
+            'is_authenticated': True,
+            'error': str(e)
+        })
 
 def login_view(request):
     # Check if there's a redirect URL in the session
@@ -340,4 +379,107 @@ def add_rating_view(request):
         
         return redirect(f'/movies/{movie_id}/')
     
+    return redirect('/movies/')
+
+def add_to_watchlist_view(request):
+    if request.method == 'POST':
+        movie_id = request.POST.get('movie_id')
+        
+        # Get the Clerk token
+        clerk_token = (
+            request.COOKIES.get('clerk_token') or
+            request.COOKIES.get('__clerk_db_jwt') or
+            request.COOKIES.get('__session') or
+            request.headers.get('Authorization', '').replace('Bearer ', '')
+        )
+        
+        if clerk_token:
+            try:
+                # Get or create a Django user for this Clerk user
+                import hashlib
+                from django.contrib.auth.models import User
+                from movies.models import Movie, Watchlist
+                
+                hash_object = hashlib.md5(clerk_token.encode())
+                username = f"clerk_{hash_object.hexdigest()[:8]}"
+                
+                user, created = User.objects.get_or_create(username=username)
+                
+                # Get the movie object
+                movie = Movie.objects.get(id=movie_id)
+                
+                # Check if the movie is already in the watchlist
+                existing = Watchlist.objects.filter(user_id=user.id, movie=movie).exists()
+                
+                if not existing:
+                    # Create watchlist entry
+                    watchlist_item = Watchlist(
+                        user_id=user.id,
+                        movie=movie,
+                        title=movie.title,
+                        poster_url=movie.poster_url
+                    )
+                    watchlist_item.save()
+                    
+                    messages.success(request, "Movie added to your watchlist!")
+                else:
+                    messages.info(request, "This movie is already in your watchlist.")
+                    
+            except Movie.DoesNotExist:
+                messages.error(request, "Movie not found.")
+            except Exception as e:
+                print(f"Error adding to watchlist: {str(e)}")
+                messages.error(request, "Error adding to watchlist. Please try again.")
+        else:
+            # Redirect to login if not authenticated
+            request.session['redirect_after_login'] = f'/movies/{movie_id}/'
+            return redirect('/login/')
+            
+        return redirect(f'/movies/{movie_id}/')
+    return redirect('/movies/')
+
+# Add this function after add_to_watchlist_view
+
+def remove_from_watchlist_view(request):
+    if request.method == 'POST':
+        watchlist_id = request.POST.get('watchlist_id')
+        
+        # Get the Clerk token
+        clerk_token = (
+            request.COOKIES.get('clerk_token') or
+            request.COOKIES.get('__clerk_db_jwt') or
+            request.COOKIES.get('__session') or
+            request.headers.get('Authorization', '').replace('Bearer ', '')
+        )
+        
+        if clerk_token:
+            try:
+                # Get the Django user for this Clerk user
+                import hashlib
+                from django.contrib.auth.models import User
+                from movies.models import Watchlist
+                
+                hash_object = hashlib.md5(clerk_token.encode())
+                username = f"clerk_{hash_object.hexdigest()[:8]}"
+                
+                user = User.objects.get(username=username)
+                
+                # Get the watchlist item
+                watchlist_item = Watchlist.objects.get(id=watchlist_id, user_id=user.id)
+                
+                # Delete the watchlist item
+                watchlist_item.delete()
+                
+                messages.success(request, "Movie removed from your watchlist!")
+                
+            except Watchlist.DoesNotExist:
+                messages.error(request, "Watchlist item not found.")
+            except Exception as e:
+                print(f"Error removing from watchlist: {str(e)}")
+                messages.error(request, "Error removing from watchlist. Please try again.")
+        else:
+            # Redirect to login if not authenticated
+            return redirect('/login/')
+            
+        return redirect('/watchlist/')
     return redirect('/movies/')
