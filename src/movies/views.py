@@ -180,6 +180,7 @@ def get_user_watchlist(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
+# Remove authentication and permission classes for search
 def search_movies(request):
     try:
         Movie = apps.get_model('movies', 'Movie')

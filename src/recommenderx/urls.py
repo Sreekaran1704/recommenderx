@@ -3,7 +3,7 @@ from django.urls import include, path
 from .views import (
     home_page_view, movie_list_view, movie_detail_view, recommendations_view, 
     watchlist_view, add_to_watchlist_view, remove_from_watchlist_view, 
-    login_view, signup_view, logout_view, profile_view, add_rating_view
+    login_view, signup_view, logout_view, profile_view, add_rating_view, search_movies_view
 )
 from rest_framework.documentation import include_docs_urls
 
@@ -12,6 +12,7 @@ urlpatterns = [
     path("", home_page_view, name="home"),
     path("movies/", movie_list_view, name="movie_list"),
     path("movies/<int:movie_id>/", movie_detail_view, name="movie_detail"),
+    path('search/', search_movies_view, name='search_movies'),
     path("recommendations/", recommendations_view, name="recommendations"),
     
     # User-specific pages

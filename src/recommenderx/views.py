@@ -483,3 +483,92 @@ def remove_from_watchlist_view(request):
             
         return redirect('/watchlist/')
     return redirect('/movies/')
+
+
+# Add this function after your existing views
+
+def search_movies_view(request):
+    search_query = request.GET.get('q', '')
+    
+    if not search_query:
+        return redirect('movie_list')
+
+    print(f"Search query: {search_query}")
+    # Get the Clerk token 
+    # Make API request to our backend search endpoint
+    try:
+        # Get the Clerk token for authentication
+        clerk_token = (
+            request.COOKIES.get('clerk_token') or
+            request.COOKIES.get('__clerk_db_jwt') or
+            request.COOKIES.get('__session') or
+            request.headers.get('Authorization', '').replace('Bearer ', '')
+        )
+        
+        # Set up headers for the API request
+        headers = {}
+        if clerk_token:
+            headers['Authorization'] = f'Bearer {clerk_token}'
+            
+        # Make the request to the API
+        api_url = f'http://localhost:8000/api/movies/search/?q={search_query}'
+        print(f"Making API request to: {api_url}")
+        response = requests.get(
+            f'http://localhost:8000/api/movies/search/?q={search_query}',
+            headers=headers
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Check if the response has a 'results' key
+            if 'results' in data:
+                movies = data['results']
+            else:
+                # If the API returns a list directly
+                movies = data
+        else:
+            print(f"Search API returned status code: {response.status_code}")
+            movies = []
+    except Exception as e:
+        print(f"Error fetching search results: {str(e)}")
+        movies = []
+
+    # Get genres for filter dropdown (handle potential error)
+    try:
+        genres_response = requests.get('http://localhost:8000/api/movies/genres/')
+        if genres_response.status_code == 200:
+            genres = genres_response.json().get('genres', [])
+        else:
+            genres = []
+    except Exception as e:
+        print(f"Error fetching genres: {str(e)}")
+        genres = []    
+    
+    # Sort movies by title
+    movies = sorted(movies, key=lambda x: x.get('title', '').lower())
+    
+    # Pagination
+    page = request.GET.get('page', 1)
+    paginator = Paginator(movies, 12)  # Show 12 movies per page
+    
+    try:
+        movies_page = paginator.page(page)
+    except PageNotAnInteger:
+        movies_page = paginator.page(1)
+    except EmptyPage:
+        movies_page = paginator.page(paginator.num_pages)
+    
+    # Render the search results template with all necessary context
+    context = {
+        'query': search_query,
+        'movies': movies_page,
+        'genres': genres,
+        'current_genre': '',
+        'search_query': search_query,
+        'sort_by': 'title',
+        'page_obj': movies_page,  # For pagination template
+        'CLERK_PUBLISHABLE_KEY': settings.CLERK_PUBLISHABLE_KEY
+    }
+    
+    print(f"Rendering template with {len(movies)} movies")
+    return render(request, 'movies/search_results.html', context)

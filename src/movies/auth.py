@@ -27,8 +27,8 @@ class ClerkJWTAuthentication(BaseAuthentication):
             
             # TEMPORARY FIX: For session tokens (starting with dvb_), 
             # create a simple user object for rating operations
-            if token.startswith('dvb_') and ('ratings' in request.path or 'watchlist' in request.path):
-                print("Using session token for rating/watchlist operation")
+            if token.startswith('dvb_') and ('ratings' in request.path or 'watchlist' in request.path or 'search' in request.path):
+                print(f"Using session token for {request.path}")
                 # Create a simple user object with the session ID as the user ID
                 user = type('ClerkUser', (), {
                     'id': token,  # Use the session token as the user ID
