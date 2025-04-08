@@ -1,113 +1,179 @@
 {% extends 'base.html' %}
 
+{% block title %}RecommenderX - Find Your Next Favorite Movie{% endblock %}
+
 {% block extra_css %}
 <style>
+    .hero-section {
+        position: relative;
+        height: 80vh;
+        min-height: 500px;
+        background-size: cover;
+        background-position: center;
+        color: white;
+        margin-top: -20px;
+        margin-bottom: 40px;
+    }
+    
+    .hero-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.8) 100%);
+        display: flex;
+        align-items: center;
+    }
+    
+    .hero-content {
+        max-width: 600px;
+        padding: 0 20px;
+    }
+    
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    
+    .hero-meta {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    
+    .hero-rating {
+        display: inline-flex;
+        align-items: center;
+        margin-right: 15px;
+    }
+    
+    .hero-rating .star {
+        color: #ffc107;
+        margin-right: 5px;
+    }
+    
+    .hero-description {
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+        line-height: 1.6;
+    }
+    
     .section-title {
         font-size: 1.8rem;
-        font-weight: 800;
-        margin-bottom: 1rem;
-        color: #fff;
-        background: linear-gradient(to right, #ff5f6d, #ffc371);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        font-weight: bold;
+        margin-bottom: 1.5rem;
+        padding-left: 0.5rem;
+        border-left: 4px solid #e50914;
     }
-
-    .horizontal-scroll {
-        display: flex;
-        gap: 1rem;
-        overflow-x: auto;
-        padding-bottom: 10px;
-        scroll-snap-type: x mandatory;
+    
+    .movie-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        margin-bottom: 1.5rem;
     }
-
-    .movie-card-horizontal {
-        min-width: 200px;
-        flex: 0 0 auto;
-        background: rgba(255, 255, 255, 0.07);
-        backdrop-filter: blur(6px);
-        border-radius: 20px;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
-        scroll-snap-align: start;
+    
+    .movie-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
     }
-
-    .movie-card-horizontal:hover {
-        transform: scale(1.05);
-        box-shadow: 0 12px 30px rgba(255, 99, 132, 0.3);
+    
+    .view-details-btn {
+        background-color: #e50914;
+        border-color: #e50914;
     }
-
-    .movie-poster-sm {
-        width: 100%;
-        height: 250px;
-        object-fit: cover;
-        border-radius: 20px 20px 0 0;
-    }
-
-    .movie-body {
-        padding: 0.75rem 1rem;
-    }
-
-    .btn-zen {
-        background: linear-gradient(to right, #ff416c, #ff4b2b);
-        border: none;
-        color: white;
-        font-weight: 600;
-        border-radius: 30px;
-        padding: 0.5rem 1rem;
-        transition: all 0.3s;
-    }
-
-    .btn-zen:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(255, 105, 135, 0.5);
+    
+    .view-details-btn:hover {
+        background-color: #b2070f;
+        border-color: #b2070f;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="mb-5 text-center">
-    <h1 class="display-4 fw-bold text-gradient">🎬 Welcome to RecommenderX</h1>
-    <p class="lead">Stream the best. Rate smart. Get 🔥 recommendations!</p>
-    <a href="/movies/" class="btn btn-zen btn-lg mt-2">Browse All Movies</a>
-</div>
-
-<!-- Trending Movies Section -->
-<h2 class="section-title">🔥 Trending Now</h2>
-<div class="horizontal-scroll">
-    {% for movie in trending_movies %}
-    <div class="movie-card-horizontal">
-        <a href="{% url 'movie_detail' movie.id %}">
-            <img src="{{ movie.poster_url }}" class="movie-poster-sm" alt="{{ movie.title }}">
-        </a>
-        <div class="movie-body">
-            <h6 class="mb-1 fw-bold">{{ movie.title }}</h6>
-            <p class="text-muted small mb-1">{{ movie.genre }}</p>
-            <a href="{% url 'movie_detail' movie.id %}" class="btn btn-sm btn-zen w-100">Details</a>
+<!-- Hero Section with Featured Movie -->
+{% if featured_movie %}
+<div class="hero-section" style="background-image: url('{{ featured_movie.poster_url }}');">
+    <div class="hero-overlay">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">{{ featured_movie.title }}</h1>
+                <div class="hero-meta">
+                    <div class="hero-rating">
+                        <span class="star"><i class="fas fa-star"></i></span>
+                        <span>{{ featured_movie.rating|floatformat:1 }}</span>
+                    </div>
+                    <span>{{ featured_movie.release_year|default:"2023" }}</span>
+                    <span class="mx-2">•</span>
+                    <span>{{ featured_movie.genre }}</span>
+                </div>
+                <p class="hero-description">{{ featured_movie.description|truncatewords:50 }}</p>
+                <a href="/movies/{{ featured_movie.id }}/" class="btn btn-primary view-details-btn">
+                    <i class="fas fa-info-circle me-2"></i>View Details
+                </a>
+            </div>
         </div>
     </div>
-    {% endfor %}
-</div>
-
-<!-- Recommendations Section -->
-{% if recommended_movies %}
-<h2 class="section-title mt-5">🎯 Recommended for You</h2>
-<div class="horizontal-scroll">
-    {% for movie in recommended_movies %}
-    <div class="movie-card-horizontal">
-        <a href="{% url 'movie_detail' movie.id %}">
-            <img src="{{ movie.poster_url }}" class="movie-poster-sm" alt="{{ movie.title }}">
-        </a>
-        <div class="movie-body">
-            <h6 class="mb-1 fw-bold">{{ movie.title }}</h6>
-            <p class="text-muted small mb-1">{{ movie.genre }}</p>
-            <a href="{% url 'movie_detail' movie.id %}" class="btn btn-sm btn-zen w-100">Details</a>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="alert alert-info mt-4">
-    <strong>⚡ Psst!</strong> Start rating movies to get personalized recommendations.
 </div>
 {% endif %}
+
+<div class="container">
+    <!-- Recommended Movies Section -->
+    <h2 class="section-title">Recommended for You</h2>
+    {% if recommended_movies %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+        {% for movie in recommended_movies %}
+        <div class="col">
+            <div class="card movie-card h-100">
+                {% if movie.poster_url %}
+                <img src="{{ movie.poster_url }}" class="card-img-top movie-poster" alt="{{ movie.title }}">
+                {% else %}
+                <div class="card-img-top movie-poster bg-secondary d-flex align-items-center justify-content-center text-white">
+                    <span>No Image Available</span>
+                </div>
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ movie.title }}</h5>
+                    <p class="card-text text-muted">{{ movie.genre }}</p>
+                    <a href="/movies/{{ movie.id }}/" class="btn btn-primary view-details-btn">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        No recommended movies available. Start rating movies to get personalized recommendations!
+    </div>
+    {% endif %}
+    
+    <!-- Popular Movies Section -->
+    <h2 class="section-title mt-5">Popular Movies</h2>
+    {% if popular_movies %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+        {% for movie in popular_movies %}
+        <div class="col">
+            <div class="card movie-card h-100">
+                {% if movie.poster_url %}
+                <img src="{{ movie.poster_url }}" class="card-img-top movie-poster" alt="{{ movie.title }}">
+                {% else %}
+                <div class="card-img-top movie-poster bg-secondary d-flex align-items-center justify-content-center text-white">
+                    <span>No Image Available</span>
+                </div>
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ movie.title }}</h5>
+                    <p class="card-text text-muted">{{ movie.genre }}</p>
+                    <a href="/movies/{{ movie.id }}/" class="btn btn-primary view-details-btn">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        No popular movies available at the moment.
+    </div>
+    {% endif %}
+</div>
 {% endblock %}

@@ -6,9 +6,43 @@ from django.contrib import messages
 from django.conf import settings
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
-def home_page_view(request, *args, **kwargs):
+def home_page_view(request):
+    """Home page view showing featured and recommended movies."""
+    try:
+        from movies.models import Movie
+        
+        # Get total count for debugging
+        total_count = Movie.objects.count()
+        print(f"Total movies in database: {total_count}")
+        
+        # Just get any movies to display
+        all_movies = list(Movie.objects.all()[:20])
+        
+        if all_movies:
+            featured_movie = all_movies[0] if all_movies else None
+            recommended_movies = all_movies[1:5] if len(all_movies) > 1 else []
+            popular_movies = all_movies[5:13] if len(all_movies) > 5 else []
+            
+            print(f"Featured: {featured_movie.title if featured_movie else 'None'}")
+            print(f"Recommended: {len(recommended_movies)} movies")
+            print(f"Popular: {len(popular_movies)} movies")
+        else:
+            print("No movies found in database")
+            featured_movie = None
+            recommended_movies = []
+            popular_movies = []
+        
+    except Exception as e:
+        print(f"Error fetching movies for homepage: {str(e)}")
+        featured_movie = None
+        recommended_movies = []
+        popular_movies = []
+    
     return render(request, 'home.html', {
-        'CLERK_PUBLISHABLE_KEY': settings.CLERK_PUBLISHABLE_KEY,
+        'featured_movie': featured_movie,
+        'recommended_movies': recommended_movies,
+        'popular_movies': popular_movies,
+        'CLERK_PUBLISHABLE_KEY': settings.CLERK_PUBLISHABLE_KEY
     })
 
 def movie_list_view(request):
