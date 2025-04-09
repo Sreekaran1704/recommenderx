@@ -64,12 +64,31 @@ def movie_list_view(request):
         response = requests.get('http://localhost:8000/api/movies/')
         movies = response.json()
     
+    # Add rating information to each movie
+    try:
+        from movies.models import Rating
+        
+        for movie in movies:
+            # Get all ratings for this movie
+            ratings = Rating.objects.filter(movie_id=movie['id'])
+            
+            if ratings.exists():
+                # Calculate average rating
+                avg_rating = sum(r.rating for r in ratings) / ratings.count()
+                movie['rating'] = avg_rating
+                movie['ratings_count'] = ratings.count()
+            else:
+                movie['rating'] = 0
+                movie['ratings_count'] = 0
+    except Exception as e:
+        print(f"Error adding ratings to movies: {str(e)}")
+    
     # Sort movies based on user preference
     if sort_by == 'title':
         movies = sorted(movies, key=lambda x: x.get('title', '').lower())
     elif sort_by == 'rating':
-        # Assuming movies have an average_rating field
-        movies = sorted(movies, key=lambda x: x.get('average_rating', 0), reverse=True)
+        # Use the 'rating' field we added earlier
+        movies = sorted(movies, key=lambda x: x.get('rating', 0), reverse=True)
     elif sort_by == 'release_date':
         # Sort by release date (newest first)
         movies = sorted(movies, key=lambda x: x.get('release_date', ''), reverse=True)
