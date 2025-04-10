@@ -19,6 +19,7 @@ load_dotenv()
 
 CLERK_PUBLISHABLE_KEY = 'pk_test_cmVsYXhlZC1zdHVkLTY1LmNsZXJrLmFjY291bnRzLmRldiQ'
 CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
 print(f"Loaded Clerk key:{CLERK_PUBLISHABLE_KEY}")

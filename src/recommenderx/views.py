@@ -1,6 +1,6 @@
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
-import requests
+import requests  # Make sure this is imported at the top level
 import json
 from django.contrib import messages
 from django.conf import settings
@@ -215,6 +215,56 @@ def movie_detail_view(request, movie_id):
     # Check if user is authenticated for template
     is_authenticated = bool(clerk_token)
     
+    # Check if there's an LLM recommendation request
+    llm_recommendation = None
+    if request.GET.get('get_recommendation') == 'true':
+        try:
+            # Remove this import as it's already imported at the top
+            # import requests  <- Remove this line
+            
+            # Prepare movie information for the prompt
+            movie_title = movie.get('title', 'this movie')
+            movie_genre = movie.get('genre', '')
+            movie_description = movie.get('description', '')
+            movie_rating = movie.get('average_rating', 0)
+            
+            # Construct a prompt for the LLM
+            prompt = f"""Based on the following information about '{movie_title}'
+            is this movie worth watching? Give me the review whether this movie is worth watching in a unhinged manner if the movie is good praise it like a die hard fan but if the movie is bad trash it into grounds basically review like a toxic and stric reviewer"""
+            
+            # Make a request to Groq API with Llama 3
+            groq_api_key = settings.GROQ_API_KEY
+            headers = {
+                "Authorization": f"Bearer {groq_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": "llama3-70b-8192",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.7
+            }
+            
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code == 200:
+                response_data = response.json()
+                llm_recommendation = response_data['choices'][0]['message']['content'].strip()
+                print(f"Generated LLM recommendation for {movie_title}")
+            else:
+                print(f"Error from Groq API: {response.status_code}, {response.text}")
+                llm_recommendation = "Unable to generate a recommendation at this time. Please try again later."
+                
+        except Exception as e:
+            print(f"Error generating LLM recommendation: {str(e)}")
+            llm_recommendation = "Unable to generate a recommendation at this time. Please try again later."
+    
     # Debug the final movie object
     print(f"Final movie object has user_rating: {movie.get('user_rating') is not None}")
     if movie.get('user_rating'):
@@ -227,6 +277,7 @@ def movie_detail_view(request, movie_id):
         'is_authenticated': is_authenticated,
         'user_rating': movie.get('user_rating'),
         'has_ratings': len(movie.get('ratings', [])) > 0,
+        'llm_recommendation': llm_recommendation,  # Add the LLM recommendation to the context
     }
     
     return render(request, 'movies/movie_detail.html', context)
