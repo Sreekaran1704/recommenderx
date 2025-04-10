@@ -171,7 +171,14 @@
                 <div class="card-body">
                     <h5 class="card-title">{{ movie.title }}</h5>
                     <p class="card-text text-muted">{{ movie.genre }}</p>
-                    <a href="/movies/{{ movie.id }}/" class="btn btn-primary view-details-btn">View Details</a>
+                    
+                    <!-- Updated to display rating and button side by side -->
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-warning text-dark">
+                            <i class="fas fa-star"></i> {{ movie.rating|default:"0"|floatformat:1 }}
+                        </span>
+                        <a href="/movies/{{ movie.id }}/" class="btn btn-primary view-details-btn">View Details</a>
+                    </div>
                 </div>
             </div>
         </div>
