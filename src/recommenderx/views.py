@@ -265,56 +265,84 @@ def movie_detail_view(request, movie_id):
             if not groq_api_key:
                 print("GROQ_API_KEY is not set in environment variables")
                 llm_recommendation = "Unable to generate a recommendation. API key not configured."
-                return render(request, 'movies/movie_detail.html', {
-                    'movie': movie,
-                    'CLERK_PUBLISHABLE_KEY': settings.CLERK_PUBLISHABLE_KEY,
-                    'is_authenticated': is_authenticated,
-                    'user_rating': movie.get('user_rating'),
-                    'has_ratings': len(movie.get('ratings', [])) > 0,
-                    'llm_recommendation': llm_recommendation,
-                })
-            
-            # Ensure the API key is properly formatted (no quotes or whitespace)
-            groq_api_key = groq_api_key.strip().strip('"').strip("'")
-            print(f"Using GROQ API key: {groq_api_key[:5]}...")
-            
-            headers = {
-                "Authorization": f"Bearer {groq_api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": "llama3-70b-8192",
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.7
-            }
-            
-            print("Sending request to Groq API...")
-            response = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=30  # Add timeout to prevent hanging
-            )
-            
-            print(f"Groq API response status: {response.status_code}")
-            
-            if response.status_code == 200:
-                response_data = response.json()
-                llm_recommendation = response_data['choices'][0]['message']['content'].strip()
-                print(f"Generated LLM recommendation for {movie_title}")
+                # Don't return early, continue to render the template at the end of the function
             else:
-                print(f"Error from Groq API: {response.status_code}, {response.text}")
-                llm_recommendation = "Unable to generate a recommendation at this time. Please try again later."
+                try:
+                    # Ensure the API key is properly formatted (no quotes or whitespace)
+                    groq_api_key = groq_api_key.strip().strip('"').strip("'")
+                    print(f"Using GROQ API key: {groq_api_key[:5]}...")
+                    
+                    headers = {
+                        "Authorization": f"Bearer {groq_api_key}",
+                        "Content-Type": "application/json"
+                    }
+                    
+                    payload = {
+                        "model": "llama3-70b-8192",
+                        "messages": [
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 1000  # Limit response length
+                    }
+                    
+                    print("Sending request to Groq API...")
+                    response = requests.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        timeout=30  # Add timeout to prevent hanging
+                    )
+                    
+                    print(f"Groq API response status: {response.status_code}")
+                    response_text = response.text
+                    print(f"Response content: {response_text[:100]}...")  # Print first 100 chars of response
+                    
+                    if response.status_code == 200:
+                        try:
+                            response_data = response.json()
+                            if 'choices' in response_data and len(response_data['choices']) > 0:
+                                if 'message' in response_data['choices'][0] and 'content' in response_data['choices'][0]['message']:
+                                    llm_recommendation = response_data['choices'][0]['message']['content'].strip()
+                                    print(f"Generated LLM recommendation for {movie_title}")
+                                else:
+                                    print("Response format unexpected: 'message' or 'content' not found in response")
+                                    llm_recommendation = "Unable to parse the AI response. Please try again later."
+                            else:
+                                print("Response format unexpected: 'choices' not found or empty in response")
+                                llm_recommendation = "Unable to parse the AI response. Please try again later."
+                        except json.JSONDecodeError as json_err:
+                            print(f"Error decoding JSON response: {str(json_err)}")
+                            llm_recommendation = "Unable to parse the AI response. Please try again later."
+                    else:
+                        print(f"Error from Groq API: {response.status_code}, {response_text}")
+                        llm_recommendation = "Unable to generate a recommendation at this time. Please try again later."
+                except requests.exceptions.Timeout:
+                    print("Timeout error when calling Groq API")
+                    llm_recommendation = "The recommendation service is taking too long to respond. Please try again later."
                 
         except requests.exceptions.RequestException as e:
             print(f"Request error when calling Groq API: {str(e)}")
-            llm_recommendation = "Unable to connect to recommendation service. Please try again later."
+            # Provide more specific error messages based on the type of exception
+            if isinstance(e, requests.exceptions.ConnectionError):
+                llm_recommendation = "Unable to connect to the recommendation service. Please check your internet connection and try again later."
+            elif isinstance(e, requests.exceptions.Timeout):
+                llm_recommendation = "The recommendation service is taking too long to respond. Please try again later."
+            else:
+                llm_recommendation = "Unable to connect to recommendation service. Please try again later."
         except Exception as e:
             print(f"Error generating LLM recommendation: {str(e)}")
-            llm_recommendation = "Unable to generate a recommendation at this time. Please try again later."
+            # Provide more context about the error
+            error_type = type(e).__name__
+            print(f"Exception type: {error_type}")
+            
+            # Give a more specific error message based on the error type
+            if 'JSON' in error_type or 'json' in str(e).lower():
+                llm_recommendation = "Unable to process the AI response format. Our team has been notified."
+            elif 'key' in str(e).lower() or 'auth' in str(e).lower():
+                llm_recommendation = "Authentication issue with our AI service. Please try again later."
+            else:
+                llm_recommendation = "Unable to generate a recommendation at this time. Please try again later."
     
     # Debug the final movie object
     print(f"Final movie object has user_rating: {movie.get('user_rating') is not None}")
