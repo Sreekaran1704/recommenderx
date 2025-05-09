@@ -264,7 +264,7 @@ def movie_detail_view(request, movie_id):
             # Debug the API key
             if not groq_api_key:
                 print("GROQ_API_KEY is not set in environment variables")
-                llm_recommendation = "Unable to generate a recommendation. API key not configured."
+                llm_recommendation = "AI Movie Analysis is currently unavailable. Our team has been notified and is working to restore this feature. Please try again later."
                 # Don't return early, continue to render the template at the end of the function
             else:
                 try:

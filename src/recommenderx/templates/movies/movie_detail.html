@@ -115,7 +115,7 @@
     </div>
     
     {% if llm_recommendation %}
-    <div class="card mb-4">
+    <div class="card mb-4 {% if 'unavailable' in llm_recommendation %}bg-light{% endif %}">
         <div class="card-body">
             <h5 class="card-title">AI Recommendation</h5>
             <p class="card-text">{{ llm_recommendation }}</p>
