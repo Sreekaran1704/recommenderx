@@ -245,9 +245,6 @@ def movie_detail_view(request, movie_id):
     llm_recommendation = None
     if request.GET.get('get_recommendation') == 'true':
         try:
-            # Remove this import as it's already imported at the top
-            # import requests  <- Remove this line
-            
             # Prepare movie information for the prompt
             movie_title = movie.get('title', 'this movie')
             movie_genre = movie.get('genre', '')
@@ -255,11 +252,32 @@ def movie_detail_view(request, movie_id):
             movie_rating = movie.get('average_rating', 0)
             
             # Construct a prompt for the LLM
-            prompt = f"""Based on the following information about '{movie_title}'
-            is this movie worth watching? Give me the review whether this movie is worth watching in a unhinged manner if the movie is good praise it like a die hard fan but if the movie is bad trash it into grounds basically review like a toxic and stric reviewer"""
+            prompt = f"""Based on the following information about '{movie_title}' (Genre: {movie_genre}, Rating: {movie_rating}/5):
+            
+            Description: {movie_description}
+            
+            Is this movie worth watching? Give me a review of this movie in an unhinged manner. If the movie is good, praise it like a die-hard fan, but if the movie is bad, trash it into the ground. Basically, review it like a toxic and strict reviewer."""
             
             # Make a request to Groq API with Llama 3
             groq_api_key = settings.GROQ_API_KEY
+            
+            # Debug the API key
+            if not groq_api_key:
+                print("GROQ_API_KEY is not set in environment variables")
+                llm_recommendation = "Unable to generate a recommendation. API key not configured."
+                return render(request, 'movies/movie_detail.html', {
+                    'movie': movie,
+                    'CLERK_PUBLISHABLE_KEY': settings.CLERK_PUBLISHABLE_KEY,
+                    'is_authenticated': is_authenticated,
+                    'user_rating': movie.get('user_rating'),
+                    'has_ratings': len(movie.get('ratings', [])) > 0,
+                    'llm_recommendation': llm_recommendation,
+                })
+            
+            # Ensure the API key is properly formatted (no quotes or whitespace)
+            groq_api_key = groq_api_key.strip().strip('"').strip("'")
+            print(f"Using GROQ API key: {groq_api_key[:5]}...")
+            
             headers = {
                 "Authorization": f"Bearer {groq_api_key}",
                 "Content-Type": "application/json"
@@ -273,11 +291,15 @@ def movie_detail_view(request, movie_id):
                 "temperature": 0.7
             }
             
+            print("Sending request to Groq API...")
             response = requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers=headers,
-                json=payload
+                json=payload,
+                timeout=30  # Add timeout to prevent hanging
             )
+            
+            print(f"Groq API response status: {response.status_code}")
             
             if response.status_code == 200:
                 response_data = response.json()
@@ -287,6 +309,9 @@ def movie_detail_view(request, movie_id):
                 print(f"Error from Groq API: {response.status_code}, {response.text}")
                 llm_recommendation = "Unable to generate a recommendation at this time. Please try again later."
                 
+        except requests.exceptions.RequestException as e:
+            print(f"Request error when calling Groq API: {str(e)}")
+            llm_recommendation = "Unable to connect to recommendation service. Please try again later."
         except Exception as e:
             print(f"Error generating LLM recommendation: {str(e)}")
             llm_recommendation = "Unable to generate a recommendation at this time. Please try again later."
