@@ -1,0 +1,13 @@
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "python -m pip install -r requirements.txt && python src/manage.py collectstatic --noinput"
+  },
+  "deploy": {
+    "startCommand": "cd src && gunicorn recommenderx.wsgi",
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 100,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}

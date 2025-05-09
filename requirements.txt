@@ -13,3 +13,6 @@ matplotlib
 drf-yasg
 coreapi
 pyyaml
+gunicorn
+whitenoise
+dj-database-url

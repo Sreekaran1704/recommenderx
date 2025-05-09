@@ -11,6 +11,10 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "recommenderx.settings")
+# Use production settings if RAILWAY_ENVIRONMENT is set
+if os.getenv('RAILWAY_ENVIRONMENT'):
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "recommenderx.settings_production")
+else:
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "recommenderx.settings")
 
 application = get_wsgi_application()
