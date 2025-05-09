@@ -11,31 +11,33 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 import os
+import dj_database_url
 from dotenv import load_dotenv
 from pathlib import Path
 
 # Load environment variables from .env file
 load_dotenv()
 
-CLERK_PUBLISHABLE_KEY = 'pk_test_cmVsYXhlZC1zdHVkLTY1LmNsZXJrLmFjY291bnRzLmRldiQ'
+# Check if we're running on Railway
+RAILWAY_ENVIRONMENT = os.getenv('RAILWAY_ENVIRONMENT', 'development')
+IS_PRODUCTION = RAILWAY_ENVIRONMENT == 'production'
+
+# Clerk configuration
+CLERK_PUBLISHABLE_KEY = os.getenv('CLERK_PUBLISHABLE_KEY', 'pk_test_cmVsYXhlZC1zdHVkLTY1LmNsZXJrLmFjY291bnRzLmRldiQ')
 CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-
-print(f"Loaded Clerk key:{CLERK_PUBLISHABLE_KEY}")
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-!xmi1#3xd#^197b1=7ph&ugit1@1x5%x3jlues65ck302zotk3"
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-!xmi1#3xd#^197b1=7ph&ugit1@1x5%x3jlues65ck302zotk3')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = []
 
@@ -70,6 +72,7 @@ REST_FRAMEWORK = {
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Added for static file serving
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -106,15 +109,12 @@ WSGI_APPLICATION = "recommenderx.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# Database configuration using dj-database-url
 DATABASES = {
-    "default": {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'movie-recommendation',  # Database name
-        'USER': 'django_user',  # Your PostgreSQL user
-        'PASSWORD': 'recommendx12345',  # Your PostgreSQL password
-        'HOST': '34.122.215.180',  # Find this in Cloud SQL Instance details
-        'PORT': '5432',
-    }
+    "default": dj_database_url.config(
+        default=os.getenv('DATABASE_URL', 'postgresql://django_user:recommendx12345@34.122.215.180:5432/movie-recommendation'),
+        conn_max_age=600,
+    )
 }
 
 
@@ -153,6 +153,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# WhiteNoise configuration for serving static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

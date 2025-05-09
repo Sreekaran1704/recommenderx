@@ -11,6 +11,7 @@ import os
 
 from django.core.asgi import get_asgi_application
 
+# Use production settings if RAILWAY_ENVIRONMENT is set
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "recommenderx.settings")
 
 application = get_asgi_application()
