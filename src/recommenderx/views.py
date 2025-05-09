@@ -46,23 +46,40 @@ def home_page_view(request):
     })
 
 def movie_list_view(request):
-
+    from django.db.models import Q
+    from django.apps import apps
+    
+    # Get the Movie model
+    Movie = apps.get_model('movies', 'Movie')
+    
     search_query = request.GET.get('q', '')
     genre_filter = request.GET.get('genre', '')
     sort_by = request.GET.get('sort', 'title')  # Default sort by title
     
-    # Make API request to our backend
+    # Query the database directly instead of making API requests
     if search_query:
-        response = requests.get(f'http://localhost:8000/api/movies/search/?q={search_query}')
-        data = response.json()
-        movies = data.get('results', [])
+        # Search for movies by title or genre
+        movies_queryset = Movie.objects.filter(
+            Q(title__icontains=search_query) | 
+            Q(genre__icontains=search_query)
+        )
     elif genre_filter:
-        response = requests.get(f'http://localhost:8000/api/movies/genre/{genre_filter}/')
-        data = response.json()
-        movies = data.get('movies', [])
+        # Filter by genre
+        movies_queryset = Movie.objects.filter(genre__icontains=genre_filter)
     else:
-        response = requests.get('http://localhost:8000/api/movies/')
-        movies = response.json()
+        # Get all movies
+        movies_queryset = Movie.objects.all()
+    
+    # Convert queryset to list of dictionaries
+    movies = []
+    for movie in movies_queryset:
+        movies.append({
+            "id": movie.id,
+            "title": movie.title,
+            "genre": movie.genre,
+            "poster_url": movie.poster_url,
+            "description": movie.description
+        })
     
     # Add rating information to each movie
     try:
@@ -93,9 +110,9 @@ def movie_list_view(request):
         # Sort by release date (newest first)
         movies = sorted(movies, key=lambda x: x.get('release_date', ''), reverse=True)
     
-    # Get genres for filter dropdown
-    genres_response = requests.get('http://localhost:8000/api/movies/genres/')
-    genres = genres_response.json().get('genres', [])
+    # Get genres for filter dropdown directly from database
+    genres = list(Movie.objects.values_list('genre', flat=True).distinct())
+    genres = sorted(genres)
     
     # Pagination
     page = request.GET.get('page', 1)
@@ -118,14 +135,23 @@ def movie_list_view(request):
     })
 
 def movie_detail_view(request, movie_id):
-
-    # Get the movie details
-    response = requests.get(f'http://localhost:8000/api/movies/{movie_id}/')
-    movie = response.json()
+    from django.apps import apps
+    from django.shortcuts import get_object_or_404
     
-    # Ensure movie has an id field
-    if 'id' not in movie:
-        movie['id'] = movie_id
+    # Get the Movie model
+    Movie = apps.get_model('movies', 'Movie')
+    
+    # Get the movie details directly from database
+    movie_obj = get_object_or_404(Movie, id=movie_id)
+    
+    # Convert to dictionary format
+    movie = {
+        "id": movie_obj.id,
+        "title": movie_obj.title,
+        "genre": movie_obj.genre,
+        "poster_url": movie_obj.poster_url,
+        "description": movie_obj.description
+    }
     
     # Get all cookies for debugging
     all_cookies = request.COOKIES
@@ -283,12 +309,28 @@ def movie_detail_view(request, movie_id):
     return render(request, 'movies/movie_detail.html', context)
 
 def recommendations_view(request):
-    # In a real app, this would use the authenticated user
-    # For now, we'll just fetch general recommendations
+    from django.apps import apps
+    
+    # Get the Movie model
+    Movie = apps.get_model('movies', 'Movie')
+    
     try:
-        response = requests.get('http://localhost:8000/api/movies/recommendations/')
-        recommended_movies = response.json()
-    except:
+        # Get a sample of movies as recommendations
+        # In a real app, this would use a recommendation algorithm
+        movie_queryset = Movie.objects.all().order_by('?')[:10]
+        
+        # Convert queryset to list of dictionaries
+        recommended_movies = []
+        for movie in movie_queryset:
+            recommended_movies.append({
+                "id": movie.id,
+                "title": movie.title,
+                "genre": movie.genre,
+                "poster_url": movie.poster_url,
+                "description": movie.description
+            })
+    except Exception as e:
+        print(f"Error getting recommendations: {str(e)}")
         recommended_movies = []
     
     return render(request, 'movies/recommendations.html', {
@@ -369,6 +411,9 @@ def logout_view(request):
     return redirect('/')
 
 def profile_view(request):
+    from django.apps import apps
+    from movies.auth import ClerkJWTAuthentication
+    
     # Get the Clerk token from the request headers or cookies
     clerk_token = request.COOKIES.get('clerk_token') or request.headers.get('Authorization', '').replace('Bearer ', '')
     
@@ -377,31 +422,62 @@ def profile_view(request):
     
     # Get user profile data using the Clerk token
     try:
-        headers = {'Authorization': f'Bearer {clerk_token}'}
-        response = requests.get('http://localhost:8000/api/users/profile/', headers=headers)
+        # Use the ClerkJWTAuthentication to get the user from the token
+        auth = ClerkJWTAuthentication()
+        user = auth.get_user_from_token(clerk_token)
         
-        if response.status_code == 200:
-            user_data = response.json()
+        if user:
+            # Get the UserProfile model
+            UserProfile = apps.get_model('users', 'UserProfile')
             
-            # Get user's ratings
-            user_id = user_data.get('id')
-            ratings_response = requests.get(
-                f'http://localhost:8000/api/ratings/user/{user_id}/',
-                headers=headers
-            )
-            
-            if ratings_response.status_code == 200:
-                ratings_data = ratings_response.json()
-                user_data['ratings'] = ratings_data.get('ratings', [])
-            else:
-                user_data['ratings'] = []
-            
-            return render(request, 'users/profile.html', {'user': user_data})
+            try:
+                # Get the user profile
+                user_profile = UserProfile.objects.get(clerk_user_id=user.get('id'))
+                
+                # Create user data dictionary
+                user_data = {
+                    "id": user_profile.user.id,
+                    "username": user_profile.user.username,
+                    "email": user_profile.user.email,
+                    "first_name": user_profile.user.first_name,
+                    "last_name": user_profile.user.last_name,
+                    "clerk_user_id": user_profile.clerk_user_id
+                }
+                
+                # Get user's ratings directly from database
+                Rating = apps.get_model('movies', 'Rating')
+                ratings = Rating.objects.filter(user_id=user.get('id'))
+                
+                # Convert ratings to list of dictionaries
+                ratings_data = []
+                for rating in ratings:
+                    ratings_data.append({
+                        "id": rating.id,
+                        "movie": {
+                            "id": rating.movie.id,
+                            "title": rating.movie.title,
+                            "genre": rating.movie.genre,
+                            "poster_url": rating.movie.poster_url
+                        },
+                        "rating": rating.rating,
+                        "review": rating.review
+                    })
+            except UserProfile.DoesNotExist:
+                return redirect('/login/')
         else:
             return redirect('/login/')
-            
+        
+        # Render the profile template with user data and ratings
+        return render(request, 'users/profile.html', {
+            'user': user_data,
+            'ratings': ratings_data
+        })
     except Exception as e:
-        return redirect('/login/')
+        # Handle any errors
+        print(f"Profile view error: {str(e)}")
+        return render(request, 'error.html', {
+            'error': str(e)
+        })
 
 def add_rating_view(request):
     if request.method == 'POST':
@@ -592,58 +668,44 @@ def remove_from_watchlist_view(request):
 # Add this function after your existing views
 
 def search_movies_view(request):
+    from django.db.models import Q
+    from django.apps import apps
+    
     search_query = request.GET.get('q', '')
     
     if not search_query:
         return redirect('movie_list')
 
     print(f"Search query: {search_query}")
-    # Get the Clerk token 
-    # Make API request to our backend search endpoint
+    
+    # Get the Movie model
+    Movie = apps.get_model('movies', 'Movie')
+    
     try:
-        # Get the Clerk token for authentication
-        clerk_token = (
-            request.COOKIES.get('clerk_token') or
-            request.COOKIES.get('__clerk_db_jwt') or
-            request.COOKIES.get('__session') or
-            request.headers.get('Authorization', '').replace('Bearer ', '')
+        # Search for movies by title or genre directly from database
+        movies_queryset = Movie.objects.filter(
+            Q(title__icontains=search_query) | 
+            Q(genre__icontains=search_query)
         )
         
-        # Set up headers for the API request
-        headers = {}
-        if clerk_token:
-            headers['Authorization'] = f'Bearer {clerk_token}'
-            
-        # Make the request to the API
-        api_url = f'http://localhost:8000/api/movies/search/?q={search_query}'
-        print(f"Making API request to: {api_url}")
-        response = requests.get(
-            f'http://localhost:8000/api/movies/search/?q={search_query}',
-            headers=headers
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            # Check if the response has a 'results' key
-            if 'results' in data:
-                movies = data['results']
-            else:
-                # If the API returns a list directly
-                movies = data
-        else:
-            print(f"Search API returned status code: {response.status_code}")
-            movies = []
+        # Convert queryset to list of dictionaries
+        movies = []
+        for movie in movies_queryset:
+            movies.append({
+                "id": movie.id,
+                "title": movie.title,
+                "genre": movie.genre,
+                "poster_url": movie.poster_url,
+                "description": movie.description
+            })
     except Exception as e:
-        print(f"Error fetching search results: {str(e)}")
+        print(f"Error searching movies: {str(e)}")
         movies = []
 
-    # Get genres for filter dropdown (handle potential error)
+    # Get genres for filter dropdown directly from database
     try:
-        genres_response = requests.get('http://localhost:8000/api/movies/genres/')
-        if genres_response.status_code == 200:
-            genres = genres_response.json().get('genres', [])
-        else:
-            genres = []
+        genres = list(Movie.objects.values_list('genre', flat=True).distinct())
+        genres = sorted(genres)
     except Exception as e:
         print(f"Error fetching genres: {str(e)}")
         genres = []    
