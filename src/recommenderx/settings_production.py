@@ -89,6 +89,8 @@ DATABASES = {
     "default": dj_database_url.config(
         default=os.getenv('DATABASE_URL', 'postgresql://django_user:recommendx12345@34.122.215.180:5432/movie-recommendation'),
         conn_max_age=600,
+        ssl_require=True,
+        engine='django.db.backends.postgresql',
     )
 }
 
