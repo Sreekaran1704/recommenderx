@@ -567,6 +567,7 @@ def profile_view(request):
             'error': str(e)
         })
 
+@csrf_exempt
 def add_rating_view(request):
     if request.method == 'POST':
         # Check if this is a form submission or API request
@@ -735,6 +736,7 @@ def add_to_watchlist_view(request):
 
 # Add this function after add_to_watchlist_view
 
+@csrf_exempt
 def remove_from_watchlist_view(request):
     if request.method == 'POST':
         watchlist_id = request.POST.get('watchlist_id')
