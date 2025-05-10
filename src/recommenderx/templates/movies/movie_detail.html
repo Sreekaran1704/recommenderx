@@ -31,11 +31,53 @@
                     {% endif %}
                 </button>
                 
-                <form method="post" action="{% url 'add_to_watchlist' %}" class="d-inline">
+                <form id="watchlistForm" method="post" action="{% url 'add_to_watchlist' %}" class="d-inline">
                     {% csrf_token %}
                     <input type="hidden" name="movie_id" value="{{ movie.id }}">
-                    <button type="submit" class="btn btn-outline-primary">Add to Watchlist</button>
+                    <button type="submit" id="watchlistButton" class="btn {% if in_watchlist %}btn-success{% else %}btn-outline-primary{% endif %}" {% if in_watchlist %}disabled{% endif %}>
+                        {% if in_watchlist %}Added to Watchlist{% else %}Add to Watchlist{% endif %}
+                    </button>
                 </form>
+                
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const watchlistForm = document.getElementById('watchlistForm');
+                        const watchlistButton = document.getElementById('watchlistButton');
+                        
+                        watchlistForm.addEventListener('submit', function(e) {
+                            e.preventDefault();
+                            
+                            const formData = new FormData(watchlistForm);
+                            
+                            fetch(watchlistForm.action, {
+                                method: 'POST',
+                                body: formData,
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                }
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'added') {
+                                    watchlistButton.textContent = 'Added to Watchlist';
+                                    watchlistButton.classList.remove('btn-outline-primary');
+                                    watchlistButton.classList.add('btn-success');
+                                    watchlistButton.disabled = true;
+                                } else if (data.status === 'exists') {
+                                    watchlistButton.textContent = 'Added to Watchlist';
+                                    watchlistButton.classList.remove('btn-outline-primary');
+                                    watchlistButton.classList.add('btn-success');
+                                    watchlistButton.disabled = true;
+                                } else if (data.status === 'unauthenticated') {
+                                    window.location.href = data.redirect;
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                            });
+                        });
+                    });
+                </script>
             </div>
         {% else %}
             <div class="mb-4">

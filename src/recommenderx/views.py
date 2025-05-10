@@ -242,6 +242,28 @@ def movie_detail_view(request, movie_id):
     # Check if user is authenticated for template
     is_authenticated = bool(clerk_token)
     
+    # Check if movie is in user's watchlist
+    in_watchlist = False
+    if is_authenticated:
+        try:
+            from movies.models import Watchlist
+            import hashlib
+            from django.contrib.auth.models import User
+            
+            # Get the Django user ID for this clerk token
+            hash_object = hashlib.md5(clerk_token.encode())
+            username = f"clerk_{hash_object.hexdigest()[:8]}"
+            
+            try:
+                user = User.objects.get(username=username)
+                # Check if movie is in watchlist
+                in_watchlist = Watchlist.objects.filter(user_id=user.id, movie_id=movie_id).exists()
+            except User.DoesNotExist:
+                in_watchlist = False
+        except Exception as e:
+            print(f"Error checking watchlist status: {str(e)}")
+            in_watchlist = False
+    
     # Check if there's an LLM recommendation request
     llm_recommendation = None
     if request.GET.get('get_recommendation') == 'true':
@@ -358,6 +380,7 @@ def movie_detail_view(request, movie_id):
         'user_rating': movie.get('user_rating'),
         'has_ratings': len(movie.get('ratings', [])) > 0,
         'llm_recommendation': llm_recommendation,  # Add the LLM recommendation to the context
+        'in_watchlist': in_watchlist,  # Add watchlist status to the context
     }
     
     return render(request, 'movies/movie_detail.html', context)
@@ -639,12 +662,16 @@ def add_to_watchlist_view(request):
             request.headers.get('Authorization', '').replace('Bearer ', '')
         )
         
+        # Check if this is an AJAX request
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        
         if clerk_token:
             try:
                 # Get or create a Django user for this Clerk user
                 import hashlib
                 from django.contrib.auth.models import User
                 from movies.models import Movie, Watchlist
+                from django.http import JsonResponse
                 
                 hash_object = hashlib.md5(clerk_token.encode())
                 username = f"clerk_{hash_object.hexdigest()[:8]}"
@@ -667,21 +694,40 @@ def add_to_watchlist_view(request):
                     )
                     watchlist_item.save()
                     
-                    messages.success(request, "Movie added to your watchlist!")
+                    message = "Movie added to your watchlist!"
+                    status = "added"
+                    messages.success(request, message)
                 else:
-                    messages.info(request, "This movie is already in your watchlist.")
+                    message = "This movie is already in your watchlist."
+                    status = "exists"
+                    messages.info(request, message)
+                
+                # If it's an AJAX request, return JSON response
+                if is_ajax:
+                    return JsonResponse({
+                        'status': status,
+                        'message': message
+                    })
                     
             except Movie.DoesNotExist:
-                messages.error(request, "Movie not found.")
+                message = "Movie not found."
+                messages.error(request, message)
+                if is_ajax:
+                    return JsonResponse({'status': 'error', 'message': message}, status=404)
             except Exception as e:
                 print(f"Error adding to watchlist: {str(e)}")
-                messages.error(request, "Error adding to watchlist. Please try again.")
+                message = "Error adding to watchlist. Please try again."
+                messages.error(request, message)
+                if is_ajax:
+                    return JsonResponse({'status': 'error', 'message': message}, status=500)
         else:
             # Redirect to login if not authenticated
+            if is_ajax:
+                return JsonResponse({'status': 'unauthenticated', 'redirect': '/login/'}, status=401)
             request.session['redirect_after_login'] = f'/movies/{movie_id}/'
             return redirect('/login/')
         
-        # Redirect back to the movie detail page
+        # For non-AJAX requests, redirect back to the movie detail page
         return redirect(f'/movies/{movie_id}/')
     
     # If not a POST request, redirect to home
