@@ -405,18 +405,30 @@ def watchlist_view(request):
         return redirect('/login/')
     
     try:
-        # Get the Django user for this Clerk user
-        import hashlib
-        from django.contrib.auth.models import User
+        # Get the Clerk user ID from the token
+        import jwt
+        from django.conf import settings
         
-        hash_object = hashlib.md5(clerk_token.encode())
-        username = f"clerk_{hash_object.hexdigest()[:8]}"
+        # Try to decode the token to get the user ID
+        try:
+            # For JWT tokens (starting with eyJ)
+            if clerk_token.startswith('eyJ'):
+                # Just get the user ID from the token without full verification
+                payload = jwt.decode(clerk_token, options={"verify_signature": False})
+                clerk_user_id = payload.get('sub')
+            else:
+                # For session tokens or other formats, use the token itself
+                clerk_user_id = clerk_token
+                
+            print(f"Using clerk_user_id: {clerk_user_id}")
+        except Exception as e:
+            print(f"Error decoding token: {str(e)}")
+            # Fallback to using the token itself as the user ID
+            clerk_user_id = clerk_token
         
-        user = User.objects.get(username=username)
-        
-        # Get the user's watchlist
+        # Get the user's watchlist using the Clerk user ID
         from movies.models import Watchlist
-        watchlist_items = Watchlist.objects.filter(user_id=user.id)
+        watchlist_items = Watchlist.objects.filter(user_id=clerk_user_id)
         
         # Format the watchlist items for the template
         movies = []
