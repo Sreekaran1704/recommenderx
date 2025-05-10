@@ -5,6 +5,7 @@ import json
 from django.contrib import messages
 from django.conf import settings
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.views.decorators.csrf import csrf_exempt
 
 def home_page_view(request):
     """Home page view showing featured and recommended movies."""
@@ -405,30 +406,27 @@ def watchlist_view(request):
         return redirect('/login/')
     
     try:
-        # Get the Clerk user ID from the token
-        import jwt
-        from django.conf import settings
+        # Get or create a Django user for this Clerk token
+        import hashlib
+        from django.contrib.auth.models import User
         
-        # Try to decode the token to get the user ID
+        hash_object = hashlib.md5(clerk_token.encode())
+        username = f"clerk_{hash_object.hexdigest()[:8]}"
+        
         try:
-            # For JWT tokens (starting with eyJ)
-            if clerk_token.startswith('eyJ'):
-                # Just get the user ID from the token without full verification
-                payload = jwt.decode(clerk_token, options={"verify_signature": False})
-                clerk_user_id = payload.get('sub')
-            else:
-                # For session tokens or other formats, use the token itself
-                clerk_user_id = clerk_token
-                
-            print(f"Using clerk_user_id: {clerk_user_id}")
-        except Exception as e:
-            print(f"Error decoding token: {str(e)}")
-            # Fallback to using the token itself as the user ID
-            clerk_user_id = clerk_token
+            user = User.objects.get(username=username)
+            user_id = user.id
+            print(f"Found user with ID: {user_id}")
+        except User.DoesNotExist:
+            print(f"User with username {username} not found, creating new user")
+            user = User.objects.create(username=username)
+            user_id = user.id
         
-        # Get the user's watchlist using the Clerk user ID
+        # Get the user's watchlist using the Django user ID
         from movies.models import Watchlist
-        watchlist_items = Watchlist.objects.filter(user_id=clerk_user_id)
+        watchlist_items = Watchlist.objects.filter(user_id=user_id)
+        
+        print(f"Found {watchlist_items.count()} watchlist items for user {user_id}")
         
         # Format the watchlist items for the template
         movies = []
@@ -445,6 +443,7 @@ def watchlist_view(request):
         return render(request, 'movies/watchlist.html', {
             'movies': movies,
             'is_authenticated': True,
+            'CLERK_PUBLISHABLE_KEY': settings.CLERK_PUBLISHABLE_KEY
         })
         
     except Exception as e:
@@ -453,7 +452,8 @@ def watchlist_view(request):
         return render(request, 'movies/watchlist.html', {
             'movies': [],
             'is_authenticated': True,
-            'error': str(e)
+            'error': str(e),
+            'CLERK_PUBLISHABLE_KEY': settings.CLERK_PUBLISHABLE_KEY
         })
 
 def login_view(request):
@@ -626,6 +626,7 @@ def add_rating_view(request):
     
     return redirect('/movies/')
 
+@csrf_exempt
 def add_to_watchlist_view(request):
     if request.method == 'POST':
         movie_id = request.POST.get('movie_id')
@@ -679,8 +680,11 @@ def add_to_watchlist_view(request):
             # Redirect to login if not authenticated
             request.session['redirect_after_login'] = f'/movies/{movie_id}/'
             return redirect('/login/')
-            
+        
+        # Redirect back to the movie detail page
         return redirect(f'/movies/{movie_id}/')
+    
+    # If not a POST request, redirect to home
     return redirect('/movies/')
 
 # Add this function after add_to_watchlist_view
