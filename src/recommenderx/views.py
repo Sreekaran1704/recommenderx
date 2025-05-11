@@ -275,7 +275,7 @@ def movie_detail_view(request, movie_id):
             movie_rating = movie.get('average_rating', 0)
             
             # Construct a prompt for the LLM
-            prompt = f"""Based on the following information about '{movie_title}' (Genre: {movie_genre}, Rating: {movie_rating}/5):
+            prompt = f"""Based on the following information about '{movie_title}'):
             
             Description: {movie_description}
             
