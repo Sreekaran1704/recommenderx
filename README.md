@@ -101,21 +101,6 @@ Welcome to **RecommenderX**, a cloud-powered SaaS platform that delivers persona
 
 ---
 
-## ☁️ Cloud Infrastructure
-
-```mermaid
-graph TD;
-    User -->|Public Access| Django[🎯 Django App (Railway)]
-    User -->|Login/Signup| Clerk[🔐 Clerk Authentication]
-    Django --> PostgreSQL[(📊 Google Cloud SQL)]
-    Django --> GCS[(🖼️ Google Cloud Storage - Posters)]
-    Django --> Groq[LLaMA 3 via Groq API]
-    Django --> Recommender[🧠 Collaborative Filtering Engine]
-    Django --> AIReview[🤖 AI Review Generator]
-```
-
----
-
 ## 🔮 Future Scope
 
 * 🎞️ **Trailer Integration**: Embed YouTube/TMDB trailers beside poster
