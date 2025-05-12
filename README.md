@@ -1,7 +1,3 @@
-Here's a detailed and professional `README.md` for your cloud-based **Movie Recommendation SaaS** project, tailored to your actual stack (Django, PostgreSQL, Clerk, Google Cloud, Railway, LLaMA 3 via Groq, etc.):
-
----
-
 # 🎬 RecommenderX – Cloud-Based Movie Recommendation System
 
 Welcome to **RecommenderX**, a cloud-powered SaaS platform that delivers personalized movie recommendations, AI-generated reviews, and user interaction features like watchlists and ratings. Built using Django, PostgreSQL, Google Cloud, and cutting-edge AI integration.
